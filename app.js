@@ -4,6 +4,7 @@ const SUPABASE_URL = 'https://atqhfbaurrmivjarowco.supabase.co';
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cWhmYmF1cnJtaXZqYXJvd2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODc2ODgsImV4cCI6MjA5NTk2MzY4OH0.buWqvUnwid4QEE6m9OFM7n1tu51mcogTc01oG7pdtJI';
 const REST = `${SUPABASE_URL}/rest/v1/angry_submissions`;
+const FN = `${SUPABASE_URL}/functions/v1/angry-submit`;
 const HEADERS = { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` };
 
 const ERA_LABEL = { current: '2026', 2020: '2020' };
@@ -15,6 +16,12 @@ const state = {
   sortBy: 'avg',
   sortDir: 1,
   transposed: false,
+  // Identity comes from the ?k= token in the link, confirmed by the server.
+  // The page never gets to decide who you are.
+  token: new URLSearchParams(location.search).get('k'),
+  me: null,
+  deadline: null,
+  closed: false,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -170,32 +177,69 @@ function latest(era) {
     .filter((s) => (seen.has(s.ranker) ? false : seen.add(s.ranker)));
 }
 
-async function submit() {
-  const ranker = $('#ranker').value;
-  const note = $('#note').value.trim();
-  const msg = $('#submit-note');
+/** Asks the server who this link belongs to. A bad token simply isn't anybody. */
+async function identify() {
+  if (!state.token) return;
+  try {
+    const res = await fetch(`${FN}?k=${encodeURIComponent(state.token)}`, { headers: HEADERS });
+    const data = await res.json();
+    state.me = data.nick ?? null;
+    state.deadline = data.deadline ?? null;
+    state.closed = !!data.closed;
+  } catch {
+    state.me = null;
+  }
+}
 
-  if (!ranker) {
-    msg.textContent = 'Pick your name first.';
-    msg.className = 'note bad';
-    return;
+function renderIdentity() {
+  const gate = $('#gate');
+  const when = state.deadline
+    ? new Date(state.deadline).toLocaleDateString(undefined, {
+        weekday: 'long', month: 'long', day: 'numeric',
+      })
+    : null;
+
+  if (!state.token) {
+    gate.className = 'gate shut';
+    gate.innerHTML = `<b>You need your own link to vote.</b>
+      Every man got a different one. Ask Danzzy for yours — then this page will
+      know who you are and you can drag straight in. Results are open to everyone.`;
+  } else if (!state.me) {
+    gate.className = 'gate shut';
+    gate.innerHTML = `<b>That link isn't valid.</b>
+      It may have been mistyped or cut short by the chat. Ask Danzzy to resend it.`;
+  } else if (state.closed) {
+    gate.className = 'gate shut';
+    gate.innerHTML = `<b>Boards are closed.</b> The results stand.`;
+  } else {
+    gate.className = 'gate open';
+    gate.innerHTML = `Ranking as <b>${state.me}</b> · ${NAME_BY_NICK[state.me] ?? ''}
+      <span class="until">Change it as often as you like until ${when}.</span>`;
   }
 
+  const live = !!state.me && !state.closed;
+  $('#submit').disabled = !live;
+  $('#note').disabled = !live;
+  $('#board').classList.toggle('locked', !live);
+}
+
+async function submit() {
+  const msg = $('#submit-note');
   const btn = $('#submit');
   btn.disabled = true;
   btn.textContent = 'Locking…';
 
   try {
-    const res = await fetch(REST, {
+    const res = await fetch(FN, {
       method: 'POST',
-      headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ ranker, ranking: state.board, era: 'current', note: note || null }),
+      headers: { ...HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ k: state.token, ranking: state.board, note: $('#note').value.trim() }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
 
-    localStorage.setItem('angry.ranker', ranker);
     localStorage.setItem('angry.board', JSON.stringify(state.board));
-    msg.textContent = 'Board locked. Resubmit any time — the newest one counts.';
+    msg.textContent = `Board locked as ${data.ranker}. Change it any time before the deadline.`;
     msg.className = 'note good';
     $('#note').value = '';
     await load();
@@ -204,11 +248,11 @@ async function submit() {
     renderFeed();
     show('consensus');
   } catch (err) {
-    msg.textContent = `That didn't save. ${String(err).slice(0, 90)}`;
+    msg.textContent = String(err.message || err).slice(0, 120);
     msg.className = 'note bad';
   } finally {
-    btn.disabled = false;
     btn.textContent = 'Lock in board';
+    renderIdentity();
   }
 }
 
@@ -420,12 +464,6 @@ function show(name) {
 }
 
 function init() {
-  $('#ranker').innerHTML =
-    '<option value="">Pick your name</option>' +
-    ROSTER.map((m) => `<option value="${m.nick}">${m.nick} — ${m.name}</option>`).join('');
-
-  const savedRanker = localStorage.getItem('angry.ranker');
-  if (savedRanker) $('#ranker').value = savedRanker;
   const savedBoard = JSON.parse(localStorage.getItem('angry.board') || 'null');
   if (Array.isArray(savedBoard) && savedBoard.length === DEFAULT_BOARD.length) {
     state.board = savedBoard;
@@ -469,6 +507,9 @@ function init() {
       renderGrid();
     })
   );
+
+  renderIdentity();
+  identify().then(renderIdentity);
 
   load()
     .then(() => {

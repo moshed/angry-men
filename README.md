@@ -4,8 +4,10 @@ One board. Fourteen men. Drag them into the order you actually believe.
 
 **→ [moshed.github.io/angry-men](https://moshed.github.io/angry-men/)**
 
-- **Your board** — drag all fourteen into order and lock it in. Resubmit whenever
-  you change your mind; only your newest board counts.
+Each man votes from his own private link. Anyone can read the results.
+
+- **Your board** — drag all fourteen into order and lock it in. Change it as often
+  as you like until the deadline; only your newest board counts.
 - **Consensus** — the group average for each man, his best and worst vote, and his
   ego gap: how much higher he rates himself than everyone else does.
 - **The grid** — every vote in the open. Sort by any man's column to see the world

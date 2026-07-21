@@ -19,6 +19,7 @@ Four files, no build step, no dependencies, no framework. Pages serves the repo 
 | `style.css` | All styling and design tokens |
 | `data.js` | The roster: nickname, real name, 2020 seed average |
 | `app.js` | Drag reorder, Supabase read/write, tally math, pivot rendering |
+| `supabase/functions/angry-submit/` | The edge function that validates tokens and writes boards |
 
 `data.js` loads before `app.js` and exposes `ROSTER`, `NAME_BY_NICK`, `DEFAULT_BOARD`
 as globals. Deliberately plain script tags — no modules, so it works off `file://`
@@ -38,6 +39,22 @@ Every mapping was confirmed from message context. The non-obvious one:
 **Shaps (Isaac Shapiro)** and **Mayer Adelman** are active in the chat but were not
 in the 2020 file, so they carry `seed2020: null`, render an `UNSEEDED` tag, and sit
 at the bottom of the default board. Draft-board convention: undrafted goes last.
+
+## Who can vote
+
+Each man has his own link, `…/angry-men/?k=<22-char token>`. The page sends the token
+to the `angry-submit` edge function, which trades it for a name and writes the board
+using the service role. **The name is never taken from the client** — a forged
+`ranker` field in the request body is ignored. Without a valid token the board is
+dimmed and the submit button is dead; results stay readable by anyone.
+
+The first cut of this had a name dropdown and a public INSERT policy, which meant the
+page was decoration: anyone could `curl` a board in as anyone. If you ever find
+yourself adding a way for the client to declare its own identity, that hole is back.
+Details and the adversarial test list are in [CLAUDE-supabase.md](CLAUDE-supabase.md).
+
+Links are **not in this repo** — it's public. They live at
+`/Users/moshe/Documents/Fantasy/angry-men-links.txt`.
 
 ## Rules baked into the math
 
