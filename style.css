@@ -1,0 +1,584 @@
+/* ─── The Angry Men, Not Dead Yet ───────────────────────────────────────────
+   Midnight slate ground, sodium-vapour light. The light belongs to the slot,
+   never to the man standing in it.
+   ------------------------------------------------------------------------ */
+
+:root {
+  --ink: #12161f;
+  --ink-2: #1a2029;
+  --ink-3: #232b36;
+  --slot-dark: #171d26;
+  --bone: #e8e4da;
+  --sodium: #f2a03d;
+  --flare: #e2513b;
+  --dim: #6b7484;
+  --line: #2b333f;
+
+  --row-h: 62px;
+  --pad: 16px;
+  --radius: 5px;
+
+  --display: 'Big Shoulders Display', 'Haettenschweiler', 'Arial Narrow', sans-serif;
+  --body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--ink);
+  /* A fine sodium haze from the top, as if the board is lit from above. */
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(242, 160, 61, 0.10), transparent 62%);
+  background-repeat: no-repeat;
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 var(--pad) 72px;
+}
+
+/* ─── Masthead ──────────────────────────────────────────────────────────── */
+
+.masthead { padding: 34px 0 22px; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0 0 10px;
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(44px, 15vw, 92px);
+  line-height: 0.84;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.wordmark span { display: block; }
+.wordmark .the { font-size: 0.34em; letter-spacing: 0.1em; color: var(--dim); line-height: 1.2; }
+.wordmark .lit { color: var(--sodium); }
+
+.lede {
+  margin: 18px 0 0;
+  max-width: 46ch;
+  color: var(--dim);
+  font-size: 14.5px;
+}
+
+.lede b { color: var(--bone); font-weight: 600; }
+
+/* ─── Tabs ──────────────────────────────────────────────────────────────── */
+
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  gap: 2px;
+  margin: 26px -16px 0;
+  padding: 10px 16px;
+  background-color: rgba(18, 22, 31, 0.93);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  flex: 1;
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 9px 4px;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.tab:hover { color: var(--bone); }
+
+.tab[aria-selected='true'] {
+  background-color: var(--ink-3);
+  border-color: var(--line);
+  color: var(--sodium);
+}
+
+.panel { display: none; padding-top: 26px; }
+.panel.on { display: block; }
+
+/* ─── Shared section furniture ──────────────────────────────────────────── */
+
+.hed {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  margin: 0 0 6px;
+}
+
+.sub {
+  margin: 0 0 20px;
+  color: var(--dim);
+  font-size: 13.5px;
+  max-width: 52ch;
+}
+
+.field { margin-bottom: 18px; }
+
+.label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 7px;
+}
+
+select,
+textarea {
+  width: 100%;
+  background-color: var(--ink-2);
+  color: var(--bone);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 13px;
+  font-family: var(--body);
+  font-size: 15px;
+}
+
+select { appearance: none; background-image: none; }
+textarea { resize: vertical; min-height: 62px; }
+
+select:focus-visible,
+textarea:focus-visible,
+.tab:focus-visible,
+.btn:focus-visible,
+.row:focus-visible,
+.gridtable th button:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--sodium);
+  outline-offset: 2px;
+}
+
+/* ─── The board ─────────────────────────────────────────────────────────── */
+
+.board {
+  position: relative;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  touch-action: pan-y;
+}
+
+.row {
+  display: flex;
+  align-items: stretch;
+  height: var(--row-h);
+  margin-bottom: 5px;
+  background-color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  /* The row itself stays scrollable on touch; only the grip grabs. */
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.row.shift { transition: transform 0.16s cubic-bezier(0.2, 0, 0, 1); }
+
+.row.lifted {
+  cursor: grabbing;
+  z-index: 20;
+  border-color: var(--sodium);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+  transition: none;
+}
+
+/* The slot: a numbered cell that keeps its light while men move through it. */
+.slot {
+  flex: 0 0 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background-color: var(--slot-dark);
+  color: var(--dim);
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 14px;
+}
+
+.nick {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 25px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.real {
+  font-size: 11.5px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--sodium);
+  border: 1px solid rgba(242, 160, 61, 0.4);
+  border-radius: 2px;
+  padding: 1px 4px;
+  margin-left: 7px;
+  vertical-align: 2px;
+}
+
+.grip {
+  flex: 0 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font-size: 20px;
+  letter-spacing: -1px;
+  border-left: 1px solid var(--line);
+  background-color: rgba(255, 255, 255, 0.02);
+  touch-action: none;
+  cursor: grab;
+}
+
+.row.lifted .grip { color: var(--sodium); }
+
+/* The reach/steal callout that prints when a man is dropped. */
+.delta {
+  position: absolute;
+  right: 52px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+  animation: rise 0.9s ease-out forwards;
+}
+
+.delta.up { color: var(--sodium); }
+.delta.down { color: var(--flare); }
+
+@keyframes rise {
+  0% { opacity: 0; transform: translateY(6px); }
+  20% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────────────── */
+
+.btn {
+  display: block;
+  width: 100%;
+  appearance: none;
+  border: none;
+  border-radius: var(--radius);
+  background-color: var(--sodium);
+  color: #17120a;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 25px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 15px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.btn:hover { filter: brightness(1.09); }
+.btn:disabled { background-color: var(--ink-3); color: var(--dim); cursor: not-allowed; }
+
+.btn-ghost {
+  width: auto;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  padding: 8px 13px;
+}
+
+.btn-ghost:hover { color: var(--bone); filter: none; }
+
+.note {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  text-align: center;
+  min-height: 16px;
+}
+
+.note.bad { color: var(--flare); }
+.note.good { color: var(--sodium); }
+
+/* ─── Consensus ─────────────────────────────────────────────────────────── */
+
+.era {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  appearance: none;
+  background-color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 6px 13px;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] { color: var(--sodium); border-color: var(--sodium); }
+
+.standing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.standing .slot {
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  font-size: 16px;
+}
+
+.standing-body { flex: 1; min-width: 0; }
+
+.standing-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.standing-top .nick { font-size: 22px; }
+
+.avg {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Range bar: how far apart the group is on one man. */
+.range {
+  position: relative;
+  height: 4px;
+  margin-top: 9px;
+  background-color: var(--ink-3);
+  border-radius: 2px;
+}
+
+.range-bar {
+  position: absolute;
+  top: 0;
+  height: 4px;
+  background-color: rgba(242, 160, 61, 0.35);
+  border-radius: 2px;
+}
+
+.range-tick {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  background-color: var(--sodium);
+}
+
+.range-self {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  background-color: var(--flare);
+}
+
+.meta {
+  display: flex;
+  gap: 14px;
+  margin-top: 7px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--dim);
+  flex-wrap: wrap;
+}
+
+.meta .ego { color: var(--flare); }
+
+/* ─── The grid ──────────────────────────────────────────────────────────── */
+
+.scroller {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  -webkit-overflow-scrolling: touch;
+}
+
+.gridtable {
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gridtable th,
+.gridtable td {
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  text-align: center;
+  height: 34px;
+}
+
+.gridtable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--ink-3);
+  font-weight: 500;
+  color: var(--dim);
+}
+
+.gridtable th button {
+  appearance: none;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 8px 9px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.gridtable th button:hover { color: var(--bone); }
+.gridtable th.sorted button { color: var(--sodium); }
+
+.gridtable .corner,
+.gridtable .rowhead {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background-color: var(--ink-2);
+  text-align: left;
+  min-width: 96px;
+}
+
+.gridtable thead .corner { z-index: 4; background-color: var(--ink-3); }
+.gridtable .rowhead span { display: block; padding: 0 10px; font-size: 12px; }
+.gridtable .cell { width: 40px; }
+.gridtable .self { box-shadow: inset 0 0 0 1px var(--flare); }
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.legend-scale {
+  flex: 1;
+  max-width: 160px;
+  height: 6px;
+  border-radius: 3px;
+  background-image: linear-gradient(90deg, var(--sodium), var(--slot-dark));
+}
+
+/* ─── Feed ──────────────────────────────────────────────────────────────── */
+
+.feed { font-family: var(--mono); font-size: 11.5px; color: var(--dim); margin-top: 26px; }
+.feed div { padding: 5px 0; border-bottom: 1px solid var(--line); }
+.feed b { color: var(--bone); font-weight: 500; }
+
+.empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+footer {
+  margin-top: 44px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--dim);
+  line-height: 1.7;
+}
+
+@media (max-width: 420px) {
+  .slot { flex: 0 0 46px; font-size: 17px; }
+  .nick { font-size: 22px; }
+  .grip { flex: 0 0 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row.shift { transition: none; }
+  .delta { animation: none; opacity: 1; }
+  * { scroll-behavior: auto; }
+}

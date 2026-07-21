@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Angry Men — The Board</title>
+<meta name="description" content="Rank all fourteen. One board per man, newest counts.">
+<meta name="theme-color" content="#12161f">
+<meta property="og:title" content="The Angry Men, Not Dead Yet">
+<meta property="og:description" content="Drag all fourteen into order. Last board was 2020.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Est. 2020 · 14 men · one board</p>
+    <h1 class="wordmark"><span class="the">The</span><span>Angry Men</span><span class="lit">Not Dead Yet</span></h1>
+    <p class="lede">The last board closed in 2020. <b>Mordy took it at 2.44.</b> Six years is long enough — drag the fourteen into the order you actually believe.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" data-panel="board" aria-selected="true" aria-controls="panel-board">Your board</button>
+    <button class="tab" role="tab" data-panel="consensus" aria-selected="false" aria-controls="panel-consensus">Consensus</button>
+    <button class="tab" role="tab" data-panel="grid" aria-selected="false" aria-controls="panel-grid">The grid</button>
+  </nav>
+
+  <!-- ─── Ballot ─────────────────────────────────────────────────────── -->
+  <section class="panel on" id="panel-board" role="tabpanel">
+    <h2 class="hed">Set the order</h2>
+    <p class="sub">Slot 1 is the best man here. Slot 14 is not. Drag the <strong>⣿</strong> handle, or focus a row and use the arrow keys. Rank yourself honestly — the group will notice either way.</p>
+
+    <div class="field">
+      <label class="label" for="ranker">Who's ranking?</label>
+      <select id="ranker"></select>
+    </div>
+
+    <ol class="board" id="board"></ol>
+
+    <div class="field">
+      <label class="label" for="note">Defence (optional)</label>
+      <textarea id="note" maxlength="280" placeholder="One line to justify yourself. It goes on the record."></textarea>
+    </div>
+
+    <button class="btn" id="submit">Lock in board</button>
+    <p class="note" id="submit-note">Resubmit whenever you change your mind. Only your newest board counts.</p>
+
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button class="btn btn-ghost" id="reset">RESET TO 2020</button>
+      <button class="btn btn-ghost" id="shuffle">SHUFFLE</button>
+    </div>
+  </section>
+
+  <!-- ─── Consensus ──────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-consensus" role="tabpanel">
+    <h2 class="hed">Consensus board</h2>
+    <p class="sub" id="consensus-sub"></p>
+
+    <div class="era">
+      <button class="chip" data-era="current" aria-pressed="true">2026</button>
+      <button class="chip" data-era="2020" aria-pressed="false">2020</button>
+    </div>
+
+    <div id="consensus-list"></div>
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <!-- ─── Pivot ──────────────────────────────────────────────────────── -->
+  <section class="panel" id="panel-grid" role="tabpanel">
+    <h2 class="hed">The grid</h2>
+    <p class="sub">Every vote, in the open. Tap any column head to sort by that man's opinion, or swap the axes to read it the other way.</p>
+
+    <div class="era">
+      <button class="chip" data-era="current" aria-pressed="true">2026</button>
+      <button class="chip" data-era="2020" aria-pressed="false">2020</button>
+      <button class="btn btn-ghost" id="transpose" style="margin-left:auto">SWAP AXES</button>
+    </div>
+
+    <div id="grid-host"></div>
+  </section>
+
+  <footer>
+    Boards from 2020 imported from 12AM Humor.xlsx · a man's average excludes his vote for himself · anyone with the link can submit
+  </footer>
+
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
