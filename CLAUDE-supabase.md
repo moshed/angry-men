@@ -25,17 +25,17 @@ function is the only place they touch.
 
 ## Schema
 
-One table. A whole board is stored as an ordered `text[]` rather than a row per
-vote, because the ballot *is* an ordering and the pivots are computed client-side
-from a few dozen rows anyway.
+A whole board is stored as an ordered `text[]` rather than a row per vote, because
+the ballot *is* an ordering, and the aggregates are computed client-side from a few
+dozen rows anyway.
 
 ```sql
 create table public.angry_submissions (
   id         uuid primary key default gen_random_uuid(),
-  ranker     text not null,          -- nickname, e.g. 'Mordy'
-  ranking    text[] not null,        -- ordered best → worst; index 0 is rank 1
+  ranker     text,                   -- NULL for the live era. That absence is the feature.
+  ranking    text[] not null,        -- ordered funniest → least; index 0 is slot 1
   era        text not null default 'current',   -- 'current' (shown as 2026) or '2020'
-  note       text,                   -- optional one-line defence, ≤280 chars
+  note       text,                   -- optional one-line defence, ≤280 chars, shown unattributed
   created_at timestamptz not null default now()
 );
 
@@ -43,40 +43,51 @@ create index angry_submissions_era_created_idx
   on public.angry_submissions (era, created_at desc);
 ```
 
-## RLS
-
-The voter roll — the token→name mapping — is a separate table:
+The voter roll — token → name, plus which ballot is his:
 
 ```sql
 create table public.angry_voters (
   nick       text primary key,
   token      text not null unique,   -- 22 chars, [a-z0-9], ~113 bits
+  ballot_id  uuid,                   -- his row in angry_submissions; NULL until he votes
+  voted_at   timestamptz,
+  fp         text,                   -- device hash, kept here and never on a ballot
   created_at timestamptz not null default now()
 );
-alter table public.angry_voters enable row level security;
--- and NO policies whatsoever, so anon and authenticated can never read it
 ```
+
+`ballot_id` is the one thing that can re-link a man to a board, and only with the
+service role. It exists so a resubmit can overwrite in place. Drop editing and you
+can drop the column.
+
+## The public view
+
+```sql
+create view public.angry_board as
+  select ranking, era, note from public.angry_submissions;
+
+grant select on public.angry_board to anon, authenticated;
+```
+
+Three columns, deliberately. No `ranker`, no `created_at` (timestamps plus a chatty
+group deanonymise), no `id` (a stable id would let arrival order be recovered).
+Note it is a plain view, so it runs as its owner and bypasses RLS on the base table —
+that's what lets it serve rows the anon key otherwise can't touch.
 
 ## RLS
 
 ```sql
-alter table public.angry_submissions enable row level security;
-
-create policy angry_read on public.angry_submissions
-  for select to anon, authenticated using (true);
+alter table public.angry_submissions enable row level security;   -- and NO policies
+alter table public.angry_voters      enable row level security;   -- and NO policies
 ```
 
-That is the **only** policy on the table. No INSERT, no UPDATE, no DELETE for anon.
-Consequences:
+Neither table has a single policy, so the anon key can't read or write either one.
+Everything public goes through `angry_board`; everything written goes through the
+edge function on the service role. Consequences:
 
-- The public key can read results and do nothing else. Boards are written solely by
-  `angry-submit` using the service role, which bypasses RLS.
-- Nobody can edit or erase a submitted board, including their own. Changing your
-  mind means submitting a new one; `latest()` in `app.js` keeps only each ranker's
-  newest row per era, and older rows stay as history.
-- An impersonated board is therefore *recoverable*: the real man just submits
-  again before the deadline and his board wins, while the forgery stays visible in
-  the history.
+- No client can insert, edit or erase a board.
+- An impersonated board is *recoverable*: the real man submits again before the
+  deadline and it overwrites the forgery.
 
 ### Verified behaviour (smoke-tested with the anon key)
 
@@ -104,9 +115,11 @@ supabase functions deploy angry-submit --project-ref atqhfbaurrmivjarowco
 
 JWT-verified, so callers must send the anon key as `Authorization: Bearer`. Two routes:
 
-- `GET  ?k=<token>` → `{ nick, deadline, closed }`. `nick` is `null` for anything
-  unrecognised; the page uses this to render "Ranking as MORDY".
-- `POST { k, ranking, note }` → `{ ok, ranker }`.
+- `GET  ?k=<token>` → `{ nick, voted, deadline, closed }`. `nick` is `null` for
+  anything unrecognised; the page renders "Ranking as MORDY" from it. The page must
+  not show "invalid link" before this resolves — it did once, and accused every
+  good link of being fake for a beat.
+- `POST { k, ranking, note }` → `{ ok: true }`.
 
 What it enforces, all server-side:
 
@@ -168,8 +181,8 @@ His old link stops working immediately. Boards he already submitted are untouche
 ## Historical seed
 
 The ten 2020 boards were imported from `12AM Humor.xlsx` as `era = '2020'` rows.
-Because the anon insert policy forbids that era, they were written with the
-Management API. That's also how any future admin fix has to be done.
+They were written with the Management API, which is also the only way to touch
+them now. That's also how any future admin fix has to be done.
 
 ```bash
 export TOK=$(security find-generic-password -s "Supabase CLI" -w \
