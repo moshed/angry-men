@@ -1,8 +1,9 @@
 # Angry Men Rankings — "The Board"
 
 A single static page where the WhatsApp group **"The Angry Men Not Dead Yet"** ranks
-each other. Anyone with the link drags all 14 men into order, locks it in, and the
-results roll up into a consensus board and a sortable pivot grid.
+each other for humour. Each man has a private link, drags all 14 into order and locks
+it in; the boards roll up into a consensus table and a sortable positions pivot.
+**Ballots are secret** — nothing shows or serves a board with a name on it.
 
 - **Live:** https://moshed.github.io/angry-men/
 - **Repo:** `moshed/angry-men` (public — GitHub Pages on a free account requires it)
@@ -15,7 +16,7 @@ Four files, no build step, no dependencies, no framework. Pages serves the repo 
 
 | File | Job |
 |---|---|
-| `index.html` | Markup + three tab panels (Your board / Consensus / The grid) |
+| `index.html` | Markup + three tab panels (Your board / Consensus / Positions) |
 | `style.css` | All styling and design tokens |
 | `data.js` | The roster: nickname, real name, 2020 seed average |
 | `app.js` | Drag reorder, Supabase read/write, tally math, pivot rendering |
@@ -58,18 +59,53 @@ Links are **not in this repo** — it's public. They live at
 
 ## Rules baked into the math
 
-- **A man's average excludes his own vote for himself.** This is the 2020 sheet's
-  own rule, reproduced exactly (`tally()` in `app.js`). His self-vote is held aside
-  and shown as the **ego gap** = `avg − self`. Positive means he rates himself
-  higher than the group does. Bob's 2020 ego gap is +6.3 and it is the single
-  funniest number in the dataset.
-- **One man, one board — newest wins.** Resubmission is allowed and expected;
-  `latest()` keeps only each ranker's most recent row per era. Nothing is ever
-  updated or deleted, so the full history stays intact as an audit trail.
+- **Secret ballot.** No board is ever shown, or served, with a name on it. See
+  "Anonymity" below — it is the constraint the rest of the design bends around.
+- **Everyone ranks all fourteen, themselves included.** The 2020 sheet excluded a
+  man's vote for himself, and that rule had to go: *any* self-exclusion mechanism
+  identifies the voter (store `self_rank` and the man at that index is the caster;
+  omit his own name and the missing man is the caster). Self-votes therefore count.
+  This shifts the historical 2020 figures very slightly from the spreadsheet —
+  Mordy reads 2.4 here vs 2.44 there — because self-votes are now included.
+- **One man, one board — overwritten in place.** Resubmitting PATCHes the existing
+  row. Revisions are deliberately *not* kept: a stack of edits from one man is a
+  behavioural signature, and diffing them would expose him.
+- **Results stay hidden until 3 boards are in** (`MIN_BALLOTS`), since with one
+  ballot the "average" is simply that man's board read aloud.
 - **No ties.** A drag-ordered list can't express them. The 2020 sheet had two
   (Mansy gave Rubin and Schlam a shared 2.5; Marmz gave Mansy and Rubin a shared
   11), so those import as adjacent whole ranks. Consequence: Schlam reads 5.67 here
   vs 5.61 in the sheet, Rubin 7.56 vs 7.50. **The finishing order is unchanged.**
+
+## Anonymity
+
+This was retrofitted, and it drove more of the design than anything else. The
+threats that were actually closed, in order of how easy they'd be to miss:
+
+1. **The obvious one** — `ranker` is NULL on every live-era ballot.
+2. **The API** — the public key can no longer read `angry_submissions` at all. It
+   reads `angry_board`, a view exposing `ranking, era, note` and nothing else. Even
+   the 2020 boards are served unattributed now.
+3. **Timestamps** — a ballot's `created_at` plus a chatty group ("just did mine")
+   identifies the caster. The view returns no timestamp.
+4. **Row order** — PostgREST with no `order` returns physical, i.e. insertion,
+   order. Since the view exposes no id or timestamp there is nothing to sort by,
+   so arrival order can't be recovered.
+5. **Small n** — with one board in, the "average" *is* that board. Results stay
+   hidden below `MIN_BALLOTS` (3).
+6. **Edit history** — repeated submissions overwrite in place. A stack of one
+   man's revisions is a signature and diffing them would expose him.
+7. **The fingerprint** — `fp` (a hash of IP + user-agent) used to sit on the
+   ballot, which would re-link device to board. It lives on `angry_voters` now.
+8. **The who-voted feed** — removed entirely. "Nugsy just voted" plus a new ballot
+   appearing is a full deanonymisation.
+
+**What is *not* claimed:** perfect anonymity from you. `angry_voters.ballot_id`
+points at each man's row, because overwriting his board on resubmit requires
+knowing which one is his. Holding the service-role key you can join the two. That
+link is the price of letting men change their minds; drop editing and it can go.
+Nothing short of blind signatures removes it, which is absurd for fourteen men and
+a joke spreadsheet. Anonymity from *everyone else* is real and enforced server-side.
 
 ## Design notes
 
@@ -79,13 +115,14 @@ has a `Rank | Pitcher | Diff` layout).
 
 - **Palette:** midnight slate ground `#12161F` (blue-shifted, not black), warm bone
   text `#E8E4DA`, sodium-vapour amber `#F2A03D` as the light, flare red `#E2513B`
-  held back for the ego gap and self-votes only.
+  held back for the one accent that isn't the light.
 - **Type:** Big Shoulders Display (condensed signage) for names and headings,
   IBM Plex Sans for body, IBM Plex Mono for all figures. Tabular numerals throughout.
 - **Signature:** *the light belongs to the slot, not the man.* Slot 1 is lit full
   sodium and slot 14 sits in the dark; when you drag someone into slot 1 he takes
-  the light already there. The same rank→light scale then becomes the pivot grid's
-  heat map, so one visual system covers ballot and results.
+  the light already there. The same scale then becomes the Positions heat map —
+  there shading by *how many boards agreed*, not by slot — so one visual system
+  covers ballot and results.
 - On drop, the moved row prints a `▲n` / `▼n` reach-or-steal callout, the one
   animated moment on the page. Respects `prefers-reduced-motion`.
 

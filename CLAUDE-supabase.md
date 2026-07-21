@@ -11,12 +11,17 @@ The anon key is embedded in `app.js`. That key is public by design; RLS is what
 actually protects the data, and **it grants read only**. Every write goes through
 the `angry-submit` edge function, which is the sole holder of the service role.
 
-## The rule that everything else follows
+## The two rules everything else follows
 
-**A voter's name is derived server-side from a secret token, never taken from the
-request body.** The page has no say in who you are. Any design change that lets the
-client name itself reintroduces impersonation — that was the whole point of the
-rebuild, so don't undo it.
+1. **A voter's name is derived server-side from a secret token, never taken from the
+   request body.** The page has no say in who you are. Any change that lets the
+   client name itself reintroduces impersonation.
+2. **A stored ballot carries no voter.** `ranker` is NULL for the live era, and the
+   public reads a view that can't return a name, a timestamp or a row id at all.
+
+The two pull against each other — the token has to identify you long enough to check
+the roll and find your row, then that identity must not reach the ballot. The edge
+function is the only place they touch.
 
 ## Schema
 
@@ -77,7 +82,8 @@ Consequences:
 
 | Attempt | Result |
 |---|---|
-| `GET` submissions | allowed |
+| `GET angry_board` (the view) | allowed — no names, no timestamps |
+| `GET angry_submissions` (the table) | `[]` — no SELECT policy |
 | `POST` a board directly to PostgREST | `401` — blocked |
 | `GET angry_voters` | `[]` — RLS returns nothing, tokens are unreadable |
 | `DELETE ?ranker=eq.Bob` | `204` **but zero rows affected** — RLS filtered it |
@@ -105,14 +111,21 @@ JWT-verified, so callers must send the anon key as `Authorization: Bearer`. Two 
 What it enforces, all server-side:
 
 1. Token matches `^[a-z0-9]{22}$` and resolves to exactly one row in `angry_voters`.
-2. `ranker` is set from that lookup. **Any `ranker` in the request body is ignored.**
+2. The name from that lookup is used **only** to find the man's existing ballot.
+   `ranker` is written NULL. Any `ranker` in the request body is ignored.
 3. The deadline has not passed.
-4. `ranking` is an exact permutation of the roll — no duplicates, omissions or extras.
-5. At most 40 boards per man, as a flood stop.
+4. `ranking` is an exact permutation of the roll — no duplicates, omissions or extras,
+   the voter himself included. Letting a man omit himself would make the missing
+   name a signature.
+5. If he has voted, his row is PATCHed in place; otherwise INSERT, then his
+   `ballot_id` is recorded. One row per man, ever — no revision trail to diff.
 6. `note` trimmed to 280 chars.
 
-It also stores `fp`, an 8-byte SHA-256 prefix of `x-forwarded-for` + user-agent, purely
-so a leaked link can be traced after the fact. It is not an access control.
+`POST` returns only `{ok:true}`. It used to echo the name back, which would let anyone
+watching the network tab pair a response with the ballot that appeared a moment later.
+
+`fp` (an 8-byte SHA-256 prefix of `x-forwarded-for` + user-agent) is stored on
+`angry_voters`, **never on the ballot** — on a ballot it would re-link device to board.
 
 ### Adversarial tests that must keep passing
 
@@ -124,8 +137,10 @@ so a leaked link can be traced after the fact. It is not an access control.
 | POST a board with a duplicated name | `400` doesn't match roster |
 | POST a board of the wrong length | `400` needs all 14 |
 | `GET ?k=<junk>` | `{ nick: null }` |
+| POST twice with one token | one row total, overwritten |
+| `GET angry_board` | never a name or timestamp for the live era |
 
-The third row is the one that matters. If it ever saves as `Bob`, impersonation is back.
+Row three is the one that matters for impersonation; the last two for anonymity.
 
 ## The deadline
 
