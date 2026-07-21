@@ -607,6 +607,18 @@ textarea:focus-visible,
 
 .legend-scale.rev { background-image: linear-gradient(90deg, var(--slot-dark), var(--sodium)); }
 
+.warn {
+  border: 1px solid rgba(226, 81, 59, 0.5);
+  background-color: rgba(226, 81, 59, 0.09);
+  border-radius: var(--radius);
+  padding: 10px 13px;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--bone);
+}
+
 /* ─── Anonymous notes ───────────────────────────────────────────────────── */
 
 .minihed {

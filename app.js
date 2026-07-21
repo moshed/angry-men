@@ -4,9 +4,10 @@ const SUPABASE_URL = 'https://atqhfbaurrmivjarowco.supabase.co';
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cWhmYmF1cnJtaXZqYXJvd2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODc2ODgsImV4cCI6MjA5NTk2MzY4OH0.buWqvUnwid4QEE6m9OFM7n1tu51mcogTc01oG7pdtJI';
 
-// Reads go through a view that exposes the ordering and nothing else — no name,
-// no timestamp, not even a row id. There is no endpoint that returns a ballot
-// with a man attached to it, so the page couldn't leak one if it tried.
+// Public reads go through a view exposing the ordering and nothing else — no
+// name, no timestamp, not even a row id. Names ARE stored; they're just never
+// served to the men. The one way to get an attributed board is the edge
+// function with the admin token, which only the runner holds.
 const REST = `${SUPABASE_URL}/rest/v1/angry_board`;
 const FN = `${SUPABASE_URL}/functions/v1/angry-submit`;
 const HEADERS = { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` };
@@ -22,7 +23,14 @@ const state = {
   era: 'current',
   sortBy: 'avg',
   sortDir: 1,
+  gridSort: 'name',
+  gridDir: 1,
   token: new URLSearchParams(location.search).get('k'),
+  // Present only in the runner's own URL. Everything it unlocks is fetched
+  // from the edge function, which re-checks it — the flag alone grants nothing.
+  adminKey: new URLSearchParams(location.search).get('a'),
+  admin: false,
+  attributed: [],
   me: null,
   // Until the server has ruled on the token we know nothing. Rendering "invalid"
   // in the meantime accuses every valid link of being fake for a beat.
@@ -203,7 +211,7 @@ function renderIdentity() {
     gate.className = 'gate shut';
     gate.innerHTML = `<b>You need your own link to vote.</b>
       Every man got a different one. Ask Danzzy for yours. Results are open to
-      everyone — and every board is secret, including yours.`;
+      everyone; individual boards are not.`;
   } else if (!state.me) {
     gate.className = 'gate shut';
     gate.innerHTML = `<b>That link isn't valid.</b>
@@ -213,7 +221,7 @@ function renderIdentity() {
     gate.innerHTML = `<b>Boards are closed.</b> The results stand.`;
   } else {
     gate.className = 'gate open';
-    gate.innerHTML = `Ranking as <b>${state.me}</b> · your board is secret
+    gate.innerHTML = `Ranking as <b>${state.me}</b> · no one else sees your board
       <span class="until">${
         state.voted
           ? `You're in. Change your board as often as you like until ${when} — it replaces the old one.`
@@ -245,7 +253,7 @@ async function submit() {
 
     state.voted = true;
     localStorage.setItem('angry.board', JSON.stringify(state.board));
-    msg.textContent = 'Board in. Nobody can see it was yours.';
+    msg.textContent = 'Board in. None of the others can see it was yours.';
     msg.className = 'note good';
     $('#note').value = '';
     await load();
@@ -428,6 +436,78 @@ function renderPositions() {
     }));
 }
 
+/* ─── The grid (runner's eyes only) ───────────────────────────────────── */
+
+async function loadAdmin() {
+  if (!state.adminKey) return;
+  try {
+    const res = await fetch(`${FN}?a=${encodeURIComponent(state.adminKey)}`, { headers: HEADERS });
+    const data = await res.json();
+    state.admin = !!data.admin;
+    state.attributed = data.ballots ?? [];
+  } catch {
+    state.admin = false;
+  }
+  $('#tab-grid').hidden = !state.admin;
+}
+
+function renderGrid() {
+  if (!state.admin) return;
+  const host = $('#grid-host');
+  const ballots = state.attributed.filter((b) => b.era === state.era && b.ranker);
+
+  if (!ballots.length) {
+    host.innerHTML = `<div class="empty">No attributed boards for ${ERA_LABEL[state.era]}.</div>`;
+    return;
+  }
+
+  const rankers = ballots.map((b) => b.ranker).sort();
+  const rankees = tally(state.era).rows.map((r) => r.nick);
+  const at = (ranker, rankee) => {
+    const b = ballots.find((x) => x.ranker === ranker);
+    const i = b ? b.ranking.indexOf(rankee) : -1;
+    return i === -1 ? null : i + 1;
+  };
+
+  const sorted = [...rankees].sort((a, b) => {
+    let av, bv;
+    if (state.gridSort === 'name') { av = a; bv = b; }
+    else { av = at(state.gridSort, a) ?? 99; bv = at(state.gridSort, b) ?? 99; }
+    return av > bv ? state.gridDir : av < bv ? -state.gridDir : 0;
+  });
+
+  const arrow = (k) => (state.gridSort === k ? (state.gridDir === 1 ? ' ↓' : ' ↑') : '');
+  const total = rankees.length;
+
+  host.innerHTML = `
+    <div class="warn">Only visible with your admin link. Don't share this URL — it shows every man's board with his name on it.</div>
+    <div class="scroller"><table class="gridtable">
+      <thead><tr>
+        <th class="corner ${state.gridSort === 'name' ? 'sorted' : ''}"><button data-g="name">RANKEE${arrow('name')}</button></th>
+        ${rankers.map((r) => `<th class="cell ${state.gridSort === r ? 'sorted' : ''}"><button data-g="${r}">${r}${arrow(r)}</button></th>`).join('')}
+      </tr></thead>
+      <tbody>${sorted.map((rankee) => `
+        <tr><th class="rowhead"><span>${rankee}</span></th>
+        ${rankers.map((r) => {
+          const v = at(r, rankee);
+          if (v === null) return `<td class="cell" style="color:var(--line)">·</td>`;
+          const c = lightFor(v, total, CARD);
+          return `<td class="cell ${r === rankee ? 'self' : ''}" style="background-color:${rgb(c)};color:${readable(c)}">${v}</td>`;
+        }).join('')}</tr>`).join('')}
+      </tbody>
+    </table></div>
+    <div class="legend"><span>RANK 1</span><span class="legend-scale"></span><span>RANK ${total}</span>
+      <span style="margin-left:auto">RED OUTLINE = SELF-VOTE</span></div>`;
+
+  host.querySelectorAll('button[data-g]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const k = btn.dataset.g;
+      state.gridDir = state.gridSort === k ? -state.gridDir : 1;
+      state.gridSort = k;
+      renderGrid();
+    }));
+}
+
 /* ─── Wiring ──────────────────────────────────────────────────────────── */
 
 function show(name) {
@@ -438,6 +518,7 @@ function show(name) {
 function renderAll() {
   renderConsensus();
   renderPositions();
+  renderGrid();
 }
 
 function init() {
@@ -476,6 +557,7 @@ function init() {
 
   renderIdentity();
   identify().then(renderIdentity);
+  loadAdmin().then(renderGrid);
 
   load()
     .then(() => {

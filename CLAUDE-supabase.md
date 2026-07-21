@@ -16,8 +16,9 @@ the `angry-submit` edge function, which is the sole holder of the service role.
 1. **A voter's name is derived server-side from a secret token, never taken from the
    request body.** The page has no say in who you are. Any change that lets the
    client name itself reintroduces impersonation.
-2. **A stored ballot carries no voter.** `ranker` is NULL for the live era, and the
-   public reads a view that can't return a name, a timestamp or a row id at all.
+2. **A stored ballot's voter never reaches the group.** `ranker` is recorded, but
+   the public reads a view that can't return a name, a timestamp or a row id.
+   Attribution comes back only through the admin route.
 
 The two pull against each other — the token has to identify you long enough to check
 the roll and find your row, then that identity must not reach the ballot. The edge
@@ -32,7 +33,7 @@ dozen rows anyway.
 ```sql
 create table public.angry_submissions (
   id         uuid primary key default gen_random_uuid(),
-  ranker     text,                   -- NULL for the live era. That absence is the feature.
+  ranker     text,                   -- who cast it; never served through the public view
   ranking    text[] not null,        -- ordered funniest → least; index 0 is slot 1
   era        text not null default 'current',   -- 'current' (shown as 2026) or '2020'
   note       text,                   -- optional one-line defence, ≤280 chars, shown unattributed
@@ -115,6 +116,8 @@ supabase functions deploy angry-submit --project-ref atqhfbaurrmivjarowco
 
 JWT-verified, so callers must send the anon key as `Authorization: Bearer`. Two routes:
 
+- `GET  ?a=<26-char admin token>` → `{ admin, ballots }`, every board attributed.
+  Token lives in `public.angry_admin` (RLS on, no policies, so unreadable by anon).
 - `GET  ?k=<token>` → `{ nick, voted, deadline, closed }`. `nick` is `null` for
   anything unrecognised; the page renders "Ranking as MORDY" from it. The page must
   not show "invalid link" before this resolves — it did once, and accused every
@@ -124,8 +127,7 @@ JWT-verified, so callers must send the anon key as `Authorization: Bearer`. Two 
 What it enforces, all server-side:
 
 1. Token matches `^[a-z0-9]{22}$` and resolves to exactly one row in `angry_voters`.
-2. The name from that lookup is used **only** to find the man's existing ballot.
-   `ranker` is written NULL. Any `ranker` in the request body is ignored.
+2. `ranker` is written from that lookup. Any `ranker` in the request body is ignored.
 3. The deadline has not passed.
 4. `ranking` is an exact permutation of the roll — no duplicates, omissions or extras,
    the voter himself included. Letting a man omit himself would make the missing
@@ -151,7 +153,8 @@ watching the network tab pair a response with the ballot that appeared a moment 
 | POST a board of the wrong length | `400` needs all 14 |
 | `GET ?k=<junk>` | `{ nick: null }` |
 | POST twice with one token | one row total, overwritten |
-| `GET angry_board` | never a name or timestamp for the live era |
+| `GET angry_board` | never a name or timestamp, any era |
+| `GET ?a=<junk>` | `{admin:false}`, 403 |
 
 Row three is the one that matters for impersonation; the last two for anonymity.
 

@@ -1,20 +1,22 @@
-// angry-submit — the only way a board gets written.
+// angry-submit — the only way a board gets written, and the only way an
+// attributed one is ever read.
 //
-// Two jobs, and they must not be allowed to meet:
-//   1. Prove you're allowed to vote, and that you only vote once.
-//   2. Store a ballot that carries no trace of who cast it.
+// Who sees what:
+//   the men      — aggregates only. The public `angry_board` view returns the
+//                  ordering and nothing else: no name, no timestamp, no id.
+//   the runner   — everything, by presenting the admin token, which never
+//                  touches the page unless it's in the URL.
 //
-// The token identifies you long enough to check you're on the roll and to find
-// which ballot row is yours to overwrite. The ballot row itself stores only the
-// ordering — `ranker` is left NULL for the live era. Nothing readable by the
-// public key ever ties a man to a board.
+// So `ranker` IS stored. Secrecy is enforced at the read boundary, not by
+// throwing the record away.
 //
 //   GET  ?k=<token>                     -> { nick, voted, deadline, closed }
+//   GET  ?a=<admin token>               -> { admin, ballots: [{ranker, ranking, note, era}] }
 //   POST { k, ranking: [...], note }    -> { ok }
 //
-// Note that POST does NOT echo back a name. It used to return `ranker`, which
-// would have let anyone watching the network tab pair a response with the ballot
-// that appeared a moment later.
+// POST deliberately does NOT echo back a name. It used to, which would let
+// anyone watching the network tab pair a response with the ballot that appeared
+// a moment later.
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -73,7 +75,21 @@ Deno.serve(async (req) => {
 
   try {
     if (req.method === 'GET') {
-      const voter = await voterFor(new URL(req.url).searchParams.get('k'));
+      const params = new URL(req.url).searchParams;
+
+      // The full record, for whoever runs this. Checked server-side like
+      // everything else — the page can't grant itself the privilege.
+      const admin = params.get('a');
+      if (admin) {
+        if (!/^[a-z0-9]{26}$/.test(admin)) return json({ admin: false }, 403);
+        const ok = await db(`angry_admin?select=token&token=eq.${admin}`);
+        if (!ok.ok || (await ok.json()).length !== 1) return json({ admin: false }, 403);
+
+        const all = await db('angry_submissions?select=ranker,ranking,note,era');
+        return json({ admin: true, ballots: all.ok ? await all.json() : [] });
+      }
+
+      const voter = await voterFor(params.get('k'));
       return json({
         nick: voter?.nick ?? null,
         voted: !!voter?.ballot_id,
@@ -106,12 +122,11 @@ Deno.serve(async (req) => {
     }
 
     const clean = typeof note === 'string' && note.trim() ? note.trim().slice(0, 280) : null;
-    // ranker stays NULL. That absence is the whole feature.
-    const ballot = { ranking, era: 'current', note: clean, ranker: null };
+    // The name is recorded. It simply never leaves through a public read.
+    const ballot = { ranking, era: 'current', note: clean, ranker: voter.nick };
 
     if (voter.ballot_id) {
-      // Overwrite in place. Revisions are not kept: a stack of edits from one
-      // man is a behavioural signature, and diffing them would expose him.
+      // Overwrite in place — one board per man, and no pile of revisions.
       const upd = await db(`angry_submissions?id=eq.${voter.ballot_id}`, {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },

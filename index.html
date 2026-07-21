@@ -27,12 +27,13 @@
     <button class="tab" role="tab" data-panel="board" aria-selected="true" aria-controls="panel-board">Your board</button>
     <button class="tab" role="tab" data-panel="consensus" aria-selected="false" aria-controls="panel-consensus">Consensus</button>
     <button class="tab" role="tab" data-panel="positions" aria-selected="false" aria-controls="panel-positions">Positions</button>
+    <button class="tab" role="tab" id="tab-grid" data-panel="grid" aria-selected="false" aria-controls="panel-grid" hidden>Grid</button>
   </nav>
 
   <!-- ─── Ballot ─────────────────────────────────────────────────────── -->
   <section class="panel on" id="panel-board" role="tabpanel">
     <h2 class="hed">Set the order</h2>
-    <p class="sub">Slot 1 is the funniest man here. Slot 14 is not. Drag the <strong>⣿</strong> handle, or focus a row and use the arrow keys. Rank yourself too — nobody will ever know where you put yourself.</p>
+    <p class="sub">Slot 1 is the funniest man here. Slot 14 is not. Drag the <strong>⣿</strong> handle, or focus a row and use the arrow keys. Rank yourself too — none of the others will ever see where you put yourself.</p>
 
     <div class="gate" id="gate"></div>
 
@@ -79,8 +80,21 @@
     <div id="positions-host"></div>
   </section>
 
+  <!-- ─── Grid: attributed, admin link only ──────────────────────────── -->
+  <section class="panel" id="panel-grid" role="tabpanel">
+    <h2 class="hed">The grid</h2>
+    <p class="sub">Every board with a name on it. Tap a column head to sort by that man's opinion.</p>
+
+    <div class="era">
+      <button class="chip" data-era="current" aria-pressed="true">2026</button>
+      <button class="chip" data-era="2020" aria-pressed="false">2020</button>
+    </div>
+
+    <div id="grid-host"></div>
+  </section>
+
   <footer>
-    Secret ballot · no board is ever shown with a name on it, and the server stores none · everyone ranks all fourteen, themselves included · 2020 boards imported from 12AM Humor.xlsx
+    Secret ballot · no board is ever shown to the group with a name on it · everyone ranks all fourteen, themselves included · 2020 boards imported from 12AM Humor.xlsx
   </footer>
 
 </div>

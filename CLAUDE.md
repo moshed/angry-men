@@ -3,7 +3,8 @@
 A single static page where the WhatsApp group **"The Angry Men Not Dead Yet"** ranks
 each other for humour. Each man has a private link, drags all 14 into order and locks
 it in; the boards roll up into a consensus table and a sortable positions pivot.
-**Ballots are secret** — nothing shows or serves a board with a name on it.
+**Ballots are secret from the group** — the men see aggregates only. The runner
+sees everything via an admin link.
 
 - **Live:** https://moshed.github.io/angry-men/
 - **Repo:** `moshed/angry-men` (public — GitHub Pages on a free account requires it)
@@ -55,12 +56,14 @@ yourself adding a way for the client to declare its own identity, that hole is b
 Details and the adversarial test list are in [CLAUDE-supabase.md](CLAUDE-supabase.md).
 
 Links are **not in this repo** — it's public. They live at
-`/Users/moshe/Documents/Fantasy/angry-men-links.txt`.
+`/Users/moshe/Documents/Fantasy/angry-men-links.txt`, along with the admin link.
+The admin link must never go in the group chat: it reveals every board.
 
 ## Rules baked into the math
 
-- **Secret ballot.** No board is ever shown, or served, with a name on it. See
-  "Anonymity" below — it is the constraint the rest of the design bends around.
+- **Secret ballot, from the group only.** `ranker` IS recorded on every board. The
+  secrecy is enforced at the read boundary, not by discarding the record. See
+  "Anonymity" below.
 - **Everyone ranks all fourteen, themselves included.** The 2020 sheet excluded a
   man's vote for himself, and that rule had to go: *any* self-exclusion mechanism
   identifies the voter (store `self_rank` and the man at that index is the caster;
@@ -100,12 +103,14 @@ threats that were actually closed, in order of how easy they'd be to miss:
 8. **The who-voted feed** — removed entirely. "Nugsy just voted" plus a new ballot
    appearing is a full deanonymisation.
 
-**What is *not* claimed:** perfect anonymity from you. `angry_voters.ballot_id`
-points at each man's row, because overwriting his board on resubmit requires
-knowing which one is his. Holding the service-role key you can join the two. That
-link is the price of letting men change their minds; drop editing and it can go.
-Nothing short of blind signatures removes it, which is absurd for fourteen men and
-a joke spreadsheet. Anonymity from *everyone else* is real and enforced server-side.
+**Anonymity is from the other men, and deliberately not from the runner.** Every
+board stores its `ranker`. The Grid tab shows the whole attributed matrix, and
+appears only when the URL carries a valid `?a=<26-char admin token>` — checked by
+the edge function, so the flag on its own grants nothing.
+
+There was briefly a version that NULLed `ranker` outright. Don't do that again: it
+destroys the record for no gain, since the men never had a route to it anyway.
+(It was recoverable only because `angry_voters.ballot_id` had been written first.)
 
 ## Design notes
 
