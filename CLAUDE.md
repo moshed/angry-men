@@ -64,12 +64,10 @@ The admin link must never go in the group chat: it reveals every board.
 - **Secret ballot, from the group only.** `ranker` IS recorded on every board. The
   secrecy is enforced at the read boundary, not by discarding the record. See
   "Anonymity" below.
-- **Everyone ranks all fourteen, themselves included.** The 2020 sheet excluded a
-  man's vote for himself, and that rule had to go: *any* self-exclusion mechanism
-  identifies the voter (store `self_rank` and the man at that index is the caster;
-  omit his own name and the missing man is the caster). Self-votes therefore count.
-  This shifts the historical 2020 figures very slightly from the spreadsheet —
-  Mordy reads 2.4 here vs 2.44 there — because self-votes are now included.
+- **Everyone ranks all fourteen, themselves included — but a man's vote for himself
+  never counts toward his own average, best or worst.** That was the 2020 sheet's
+  rule and it holds. The exclusion happens in SQL (`angry_stats`), not the browser,
+  because it needs `ranker` and the browser is never given one.
 - **One man, one board — overwritten in place.** Resubmitting PATCHes the existing
   row. Revisions are deliberately *not* kept: a stack of edits from one man is a
   behavioural signature, and diffing them would expose him.
@@ -86,14 +84,11 @@ This was retrofitted, and it drove more of the design than anything else. The
 threats that were actually closed, in order of how easy they'd be to miss:
 
 1. **The obvious one** — `ranker` is NULL on every live-era ballot.
-2. **The API** — the public key can no longer read `angry_submissions` at all. It
-   reads `angry_board`, a view exposing `ranking, era, note` and nothing else. Even
-   the 2020 boards are served unattributed now.
-3. **Timestamps** — a ballot's `created_at` plus a chatty group ("just did mine")
-   identifies the caster. The view returns no timestamp.
-4. **Row order** — PostgREST with no `order` returns physical, i.e. insertion,
-   order. Since the view exposes no id or timestamp there is nothing to sort by,
-   so arrival order can't be recovered.
+2. **The API** — the public key can't read `angry_submissions` at all, and there is
+   no public endpoint that returns an individual ordering in any form. It reads four
+   aggregate views: `angry_stats`, `angry_positions`, `angry_counts`, `angry_notes`.
+3. **Timestamps and row order** — moot now that no ballot is served. Nothing public
+   carries a `created_at` or a stable id, so arrival order can't be recovered.
 5. **Small n** — with one board in, the "average" *is* that board. Results stay
    hidden below `MIN_BALLOTS` (3).
 6. **Edit history** — repeated submissions overwrite in place. A stack of one

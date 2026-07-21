@@ -61,19 +61,55 @@ create table public.angry_voters (
 service role. It exists so a resubmit can overwrite in place. Drop editing and you
 can drop the column.
 
-## The public view
+## The public views
+
+The public API serves **aggregates only**. There is no endpoint that returns an
+individual ordering in any form — `angry_board`, which used to serve anonymised
+ballots, has been dropped.
 
 ```sql
-create view public.angry_board as
-  select ranking, era, note from public.angry_submissions;
+create or replace view public.angry_stats as
+select s.era, r.rankee,
+       count(*)::int                  as n,
+       round(avg(r.slot)::numeric, 4) as avg,
+       min(r.slot)::int               as best,
+       max(r.slot)::int               as worst
+  from public.angry_submissions s
+  cross join lateral unnest(s.ranking) with ordinality as r(rankee, slot)
+ where r.rankee is distinct from s.ranker      -- <- the self-vote exclusion
+ group by s.era, r.rankee;
 
-grant select on public.angry_board to anon, authenticated;
+create or replace view public.angry_positions as   -- same WHERE clause
+select s.era, r.rankee, r.slot::int as slot, count(*)::int as cnt
+  from public.angry_submissions s
+  cross join lateral unnest(s.ranking) with ordinality as r(rankee, slot)
+ where r.rankee is distinct from s.ranker
+ group by s.era, r.rankee, r.slot;
+
+create or replace view public.angry_counts as
+select era, count(*)::int as boards from public.angry_submissions group by era;
+
+create or replace view public.angry_notes as
+select era, note from public.angry_submissions where note is not null;
+
+grant select on public.angry_stats, public.angry_positions,
+                public.angry_counts, public.angry_notes to anon, authenticated;
 ```
 
-Three columns, deliberately. No `ranker`, no `created_at` (timestamps plus a chatty
-group deanonymise), no `id` (a stable id would let arrival order be recovered).
-Note it is a plain view, so it runs as its owner and bypasses RLS on the base table —
-that's what lets it serve rows the anon key otherwise can't touch.
+These are plain views, so they run as their owner and bypass RLS on the base table —
+that's what lets them serve numbers the anon key can't otherwise reach.
+
+**Why the aggregation has to happen here.** Excluding a man's vote for himself needs
+`ranker`, and `ranker` must never reach the browser. Do it in SQL and both hold at
+once. When this was computed client-side the exclusion was silently impossible, and
+self-votes were counted for a while — the 2020 figures drifting off the spreadsheet
+(Mordy 2.4 instead of 2.4444) was the tell. **`angry_stats` for era `2020` should
+reproduce `12AM Humor.xlsx` exactly; if it doesn't, something has regressed.**
+
+Side effect worth knowing: `n` is one lower for a man who has voted than for one who
+hasn't, which reveals *who* has voted. Not *what* they voted, and with no timestamps
+or orderings exposed there's nothing to correlate it against. The 2020 sheet behaved
+the same way (Lowy and Dogo had n=10, everyone else n=9).
 
 ## RLS
 
