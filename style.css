@@ -75,8 +75,27 @@ body {
 .wordmark .the { font-size: 0.34em; letter-spacing: 0.1em; color: var(--dim); line-height: 1.2; }
 .wordmark .lit { color: var(--sodium); }
 
+.strap {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 14px 0 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sodium);
+}
+
+.strap::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: rgba(242, 160, 61, 0.35);
+}
+
 .lede {
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   max-width: 46ch;
   color: var(--dim);
   font-size: 14.5px;
@@ -211,6 +230,15 @@ textarea:focus-visible,
 
 .gate.shut { border-color: var(--line); background-color: var(--ink-2); }
 .gate.shut b { display: block; color: var(--bone); margin-bottom: 3px; }
+
+.gate.wait {
+  background-color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
 
 .board.locked { opacity: 0.55; pointer-events: none; }
 
@@ -577,11 +605,27 @@ textarea:focus-visible,
   background-image: linear-gradient(90deg, var(--sodium), var(--slot-dark));
 }
 
-/* ─── Feed ──────────────────────────────────────────────────────────────── */
+.legend-scale.rev { background-image: linear-gradient(90deg, var(--slot-dark), var(--sodium)); }
 
-.feed { font-family: var(--mono); font-size: 11.5px; color: var(--dim); margin-top: 26px; }
-.feed div { padding: 5px 0; border-bottom: 1px solid var(--line); }
-.feed b { color: var(--bone); font-weight: 500; }
+/* ─── Anonymous notes ───────────────────────────────────────────────────── */
+
+.minihed {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 30px 0 10px;
+}
+
+.said {
+  border-left: 2px solid var(--line);
+  padding: 7px 0 7px 12px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--bone);
+  opacity: 0.85;
+}
 
 .empty {
   border: 1px dashed var(--line);
