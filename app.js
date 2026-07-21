@@ -4,11 +4,11 @@ const SUPABASE_URL = 'https://atqhfbaurrmivjarowco.supabase.co';
 const SUPABASE_ANON =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cWhmYmF1cnJtaXZqYXJvd2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODc2ODgsImV4cCI6MjA5NTk2MzY4OH0.buWqvUnwid4QEE6m9OFM7n1tu51mcogTc01oG7pdtJI';
 
-// Public reads go through a view exposing the ordering and nothing else — no
-// name, no timestamp, not even a row id. Names ARE stored; they're just never
-// served to the men. The one way to get an attributed board is the edge
-// function with the admin token, which only the runner holds.
-const REST = `${SUPABASE_URL}/rest/v1/angry_board`;
+// The public API serves aggregates only — no ballot, in any form. Self-votes are
+// excluded in SQL, where `ranker` is visible; that exclusion is impossible in the
+// browser precisely because the browser is never given a name. The one way to get
+// an attributed board is the edge function with the admin token.
+const REST = `${SUPABASE_URL}/rest/v1`;
 const FN = `${SUPABASE_URL}/functions/v1/angry-submit`;
 const HEADERS = { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` };
 
@@ -19,7 +19,10 @@ const MIN_BALLOTS = 3;
 
 const state = {
   board: [...DEFAULT_BOARD],
-  ballots: [],
+  stats: [],
+  positions: [],
+  counts: [],
+  notes: [],
   era: 'current',
   sortBy: 'avg',
   sortDir: 1,
@@ -28,7 +31,9 @@ const state = {
   token: new URLSearchParams(location.search).get('k'),
   // Present only in the runner's own URL. Everything it unlocks is fetched
   // from the edge function, which re-checks it — the flag alone grants nothing.
-  adminKey: new URLSearchParams(location.search).get('a'),
+  // Remembered once validated, so the admin link only has to be opened once and
+  // a truncated "&a=" in a chat app can't lock the runner out of his own grid.
+  adminKey: new URLSearchParams(location.search).get('a') || localStorage.getItem('angry.admin'),
   admin: false,
   attributed: [],
   me: null,
@@ -270,51 +275,55 @@ async function submit() {
 /* ─── Reading ─────────────────────────────────────────────────────────── */
 
 async function load() {
-  // No ordering is requested, and none is meaningful: the view hands back
-  // ballots with no id and no timestamp, so there is nothing to sort them by.
-  const res = await fetch(`${REST}?select=ranking,era,note`, { headers: HEADERS });
-  if (!res.ok) throw new Error(`Couldn't reach the board (${res.status}).`);
-  state.ballots = await res.json();
+  const grab = async (path) => {
+    const res = await fetch(`${REST}/${path}`, { headers: HEADERS });
+    if (!res.ok) throw new Error(`Couldn't reach the board (${res.status}).`);
+    return res.json();
+  };
+  [state.stats, state.positions, state.counts, state.notes] = await Promise.all([
+    grab('angry_stats?select=era,rankee,n,avg,best,worst'),
+    grab('angry_positions?select=era,rankee,slot,cnt'),
+    grab('angry_counts?select=era,boards'),
+    grab('angry_notes?select=era,note'),
+  ]);
 }
 
-/** Everything the page knows: counts, and nothing per-person. */
+/** Everything the page knows: totals, already stripped of self-votes. */
 function tally(era) {
-  const ballots = state.ballots.filter((b) => b.era === era);
-  const men = new Map();
+  const rows = state.stats
+    .filter((s) => s.era === era)
+    .map((s) => ({
+      nick: s.rankee,
+      n: s.n,
+      avg: s.avg === null ? null : Number(s.avg),   // numeric arrives as a string
+      best: s.best,
+      worst: s.worst,
+      counts: {},
+    }));
 
-  ballots.forEach((b) => {
-    b.ranking.forEach((nick, i) => {
-      if (!men.has(nick)) men.set(nick, { nick, ranks: [] });
-      men.get(nick).ranks.push(i + 1);
-    });
-  });
-
-  const rows = [...men.values()].map((m) => {
-    const counts = {};
-    m.ranks.forEach((r) => (counts[r] = (counts[r] ?? 0) + 1));
-    return {
-      nick: m.nick,
-      n: m.ranks.length,
-      counts,
-      avg: m.ranks.length ? m.ranks.reduce((a, b) => a + b, 0) / m.ranks.length : null,
-      best: m.ranks.length ? Math.min(...m.ranks) : null,
-      worst: m.ranks.length ? Math.max(...m.ranks) : null,
-    };
-  });
+  const byNick = Object.fromEntries(rows.map((r) => [r.nick, r]));
+  state.positions
+    .filter((p) => p.era === era)
+    .forEach((p) => { if (byNick[p.rankee]) byNick[p.rankee].counts[p.slot] = p.cnt; });
 
   rows.sort((a, b) => (a.avg ?? 99) - (b.avg ?? 99));
-  return { ballots, rows, notes: ballots.map((b) => b.note).filter(Boolean) };
+
+  return {
+    boards: state.counts.find((c) => c.era === era)?.boards ?? 0,
+    rows,
+    notes: state.notes.filter((n) => n.era === era).map((n) => n.note),
+  };
 }
 
 /** Below the threshold an average is just one man's ballot, read aloud. */
-const tooFew = (t) => state.era === 'current' && t.ballots.length < MIN_BALLOTS;
+const tooFew = (t) => state.era === 'current' && t.boards < MIN_BALLOTS;
 
 function waiting(t) {
-  const left = MIN_BALLOTS - t.ballots.length;
+  const left = MIN_BALLOTS - t.boards;
   return `<div class="empty">${
-    t.ballots.length === 0
+    t.boards === 0
       ? 'No boards in yet.<br>Be the first, and set the tone.'
-      : `${t.ballots.length} board${t.ballots.length === 1 ? '' : 's'} in.<br>
+      : `${t.boards} board${t.boards === 1 ? '' : 's'} in.<br>
          Results open at ${MIN_BALLOTS} — ${left} to go, so nobody's board
          can be read off the totals.`
   }</div>`;
@@ -327,11 +336,11 @@ function renderConsensus() {
   const host = $('#consensus-list');
   const label = ERA_LABEL[state.era];
 
-  $('#consensus-sub').textContent = t.ballots.length
-    ? `${t.ballots.length} secret board${t.ballots.length === 1 ? '' : 's'} in for ${label}. Everyone ranks all fourteen, themselves included.`
+  $('#consensus-sub').textContent = t.boards
+    ? `${t.boards} secret board${t.boards === 1 ? '' : 's'} in for ${label}. A man's own vote for himself never counts toward his numbers.`
     : '';
 
-  if (tooFew(t) || !t.ballots.length) {
+  if (tooFew(t) || !t.boards) {
     host.innerHTML = waiting(t);
     $('#notes').innerHTML = '';
     return;
@@ -357,7 +366,7 @@ function renderConsensus() {
           <div class="meta">
             <span>BEST ${r.best ?? '—'}</span>
             <span>WORST ${r.worst ?? '—'}</span>
-            <span>BOARDS ${r.n}</span>
+            <span>VOTES ${r.n}</span>
           </div>
         </div>
       </div>`)
@@ -381,7 +390,7 @@ function renderPositions() {
   const t = tally(state.era);
   const host = $('#positions-host');
 
-  if (tooFew(t) || !t.ballots.length) {
+  if (tooFew(t) || !t.boards) {
     host.innerHTML = waiting(t);
     return;
   }
@@ -425,7 +434,7 @@ function renderPositions() {
   host.innerHTML = `
     <div class="scroller"><table class="gridtable"><thead>${head}</thead><tbody>${body}</tbody></table></div>
     <div class="legend"><span>FEW</span><span class="legend-scale rev"></span><span>MANY</span>
-      <span style="margin-left:auto">HOW MANY BOARDS PUT HIM IN THAT SLOT</span></div>`;
+      <span style="margin-left:auto">BOARDS THAT PUT HIM THERE · SELF-VOTES EXCLUDED</span></div>`;
 
   host.querySelectorAll('button[data-sort]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -445,6 +454,8 @@ async function loadAdmin() {
     const data = await res.json();
     state.admin = !!data.admin;
     state.attributed = data.ballots ?? [];
+    if (state.admin) localStorage.setItem('angry.admin', state.adminKey);
+    else localStorage.removeItem('angry.admin');
   } catch {
     state.admin = false;
   }
@@ -561,7 +572,7 @@ function init() {
 
   load()
     .then(() => {
-      if (!state.ballots.some((b) => b.era === 'current')) {
+      if (!(state.counts.find((c) => c.era === 'current')?.boards)) {
         state.era = '2020';
         $$('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.era === '2020')));
       }
