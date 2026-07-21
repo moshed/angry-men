@@ -2,8 +2,8 @@
 // attributed one is ever read.
 //
 // Who sees what:
-//   the men      — aggregates only. The public `angry_board` view returns the
-//                  ordering and nothing else: no name, no timestamp, no id.
+//   the men      — aggregates only, via the angry_stats / angry_positions
+//                  views. No endpoint returns an individual ordering.
 //   the runner   — everything, by presenting the admin token, which never
 //                  touches the page unless it's in the URL.
 //
@@ -11,6 +11,9 @@
 // throwing the record away.
 //
 //   GET  ?k=<token>                     -> { nick, voted, deadline, closed }
+//                                          (legacy; the page calls the
+//                                           angry_whoami RPC directly instead,
+//                                           which is ~4x faster)
 //   GET  ?a=<admin token>               -> { admin, ballots: [{ranker, ranking, note, era}] }
 //   POST { k, ranking: [...], note }    -> { ok }
 //
@@ -21,9 +24,13 @@
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// Boards lock at 11:59pm ET on Monday 10 August 2026. Change this one line to
-// move the deadline; the page reads it from here so the two can't drift.
-const DEADLINE = '2026-08-11T03:59:59Z';
+// The deadline lives in public.angry_config, so this and angry_whoami() (which
+// the page calls directly) can never disagree. To move it, update that row.
+async function deadline(): Promise<string> {
+  const res = await db('angry_config?select=deadline&id=eq.1');
+  if (!res.ok) throw new Error('config unavailable');
+  return (await res.json())[0].deadline;
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -68,7 +75,7 @@ async function voterFor(token: unknown): Promise<Voter | null> {
   return rows.length === 1 ? rows[0] : null;
 }
 
-const closed = () => Date.now() > Date.parse(DEADLINE);
+const isClosed = (d: string) => Date.now() > Date.parse(d);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -89,12 +96,14 @@ Deno.serve(async (req) => {
         return json({ admin: true, ballots: all.ok ? await all.json() : [] });
       }
 
+      // Kept for compatibility; the page uses the angry_whoami RPC instead.
       const voter = await voterFor(params.get('k'));
+      const due = await deadline();
       return json({
         nick: voter?.nick ?? null,
         voted: !!voter?.ballot_id,
-        deadline: DEADLINE,
-        closed: closed(),
+        deadline: due,
+        closed: isClosed(due),
       });
     }
 
@@ -105,7 +114,9 @@ Deno.serve(async (req) => {
     const voter = await voterFor(k);
     if (!voter) return json({ error: 'That link isn\'t valid. Ask Danzzy for yours.' }, 403);
 
-    if (closed()) return json({ error: 'Boards are closed. The results stand.' }, 403);
+    if (isClosed(await deadline())) {
+      return json({ error: 'Boards are closed. The results stand.' }, 403);
+    }
 
     // The board must be an exact permutation of the roll — including the voter
     // himself. Excluding him would make the missing name a signature.

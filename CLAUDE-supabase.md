@@ -147,6 +147,48 @@ Watch out for that DELETE: **PostgREST returns `204` even when RLS matched nothi
 so a 204 is not evidence of a successful delete. Confirm with a row count via the
 Management API before concluding anything was removed.
 
+## Identity: the `angry_whoami` RPC, not the edge function
+
+The page resolves `?k=` by calling PostgREST directly:
+
+```sql
+create or replace function public.angry_whoami(k text)
+returns table (nick text, voted boolean, deadline timestamptz, closed boolean)
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select v.nick, v.ballot_id is not null, c.deadline, now() > c.deadline
+    from public.angry_voters v cross join public.angry_config c
+   where v.token = k;
+$$;
+grant execute on function public.angry_whoami(text) to anon, authenticated;
+```
+
+`SECURITY DEFINER` is what lets it see `angry_voters`, which RLS otherwise hides
+completely. It returns only the row matching an exact 22-char token, so it grants
+nothing to a caller who doesn't already have one, and `search_path` is pinned.
+
+**Why not the edge function.** It used to go through `angry-submit`, which cost
+**~250ms warm and over a second cold**, for one indexed lookup — the function was
+simply making its own HTTP call to the same PostgREST. Direct is **~60ms**, and
+PostgREST is always warm so there is no cold start at all. Measured in-page, first
+paint to "Ranking as MORDY" went from noticeably laggy to **25–54ms**.
+
+Writes still go through the edge function, where the validation matters and 250ms
+is irrelevant. Its `GET ?k=` route is kept for compatibility but the page no
+longer calls it.
+
+## The deadline lives in `angry_config`
+
+```sql
+create table public.angry_config (
+  id int primary key default 1 check (id = 1),
+  deadline timestamptz not null
+);
+```
+
+Both `angry_whoami()` and the edge function read it, so they cannot disagree. To
+move the deadline, update that one row — no deploy needed.
+
 ## Edge function: `angry-submit`
 
 Source: `supabase/functions/angry-submit/index.ts`. Deploy with
@@ -200,13 +242,6 @@ watching the network tab pair a response with the ballot that appeared a moment 
 | `GET ?a=<junk>` | `{admin:false}`, 403 |
 
 Row three is the one that matters for impersonation; the last two for anonymity.
-
-## The deadline
-
-One constant, `DEADLINE`, at the top of the edge function — currently
-`2026-08-11T03:59:59Z` (11:59pm ET, Monday 10 August 2026). The page reads it from
-the `GET` response rather than hardcoding it, so the two can't drift. To move it,
-edit that line and redeploy.
 
 ## Tokens
 

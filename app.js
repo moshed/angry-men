@@ -196,8 +196,16 @@ function useCachedIdentity() {
 async function identify() {
   if (!state.token) { state.checked = true; return; }
   try {
-    const res = await fetch(`${FN}?k=${encodeURIComponent(state.token)}`, { headers: HEADERS });
-    const data = await res.json();
+    // Straight to Postgres. Routing this through the edge function cost ~250ms
+    // warm and over a second cold, for a single indexed lookup — the function
+    // was just making its own HTTP call to the same place. Writes still go
+    // through it, where the checks matter and the latency doesn't.
+    const res = await fetch(`${REST}/rpc/angry_whoami`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ k: state.token }),
+    });
+    const [data = {}] = await res.json();
     state.me = data.nick ?? null;
     state.voted = !!data.voted;
     state.deadline = data.deadline ?? null;

@@ -139,6 +139,25 @@ the list unscrollable on a phone, which is where nearly all of these get filled 
 Reordering assumes uniform row height (`--row-h` + 5px margin). Change one, change
 the other. Keyboard: focus a row, ArrowUp/ArrowDown to move it.
 
+## Performance
+
+Two things made it feel slow, both fixed; don't reintroduce them:
+
+- **Identity through the edge function.** ~250ms warm, >1s cold, for one indexed
+  lookup. It now calls the `angry_whoami` RPC on PostgREST directly (~60ms, always
+  warm). See CLAUDE-supabase.md.
+- **Render-blocking web fonts.** The Google Fonts `<link>` blocked first paint on a
+  third-party round trip. It's `rel="preload"` + `onload` now, with a `<noscript>`
+  fallback.
+
+Identity is also cached in `localStorage` per token, so a return visit renders
+before the network answers and revalidates behind it.
+
+**Assets are versioned** (`app.js?v=5`). GitHub Pages caches for 10 minutes, so
+without this a deploy leaves browsers running half-old code — that's what caused a
+404 storm when a view was dropped while old JS was still cached. **Bump the version
+on every change to a static asset.**
+
 ## Local testing
 
 ```bash
