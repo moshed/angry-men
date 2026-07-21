@@ -101,7 +101,17 @@ threats that were actually closed, in order of how easy they'd be to miss:
 **Anonymity is from the other men, and deliberately not from the runner.** Every
 board stores its `ranker`. The Grid tab shows the whole attributed matrix, and
 appears only when the URL carries a valid `?a=<26-char admin token>` — checked by
-the edge function, so the flag on its own grants nothing.
+the edge function, so the flag on its own grants nothing. It leads with who still
+hasn't voted, and ends with three summary columns:
+
+| Column | Meaning |
+|---|---|
+| `AVG` | his consensus average, **excluding** his vote for himself |
+| `SELF` | the slot he put himself in |
+| `GAP` | `AVG − SELF`. Positive = he rates himself better than the group does. |
+
+`GAP` is the ego column and the funniest number on the page. Bob was +6.3 in 2020
+and +6.2 in 2026, which is its own kind of consistency.
 
 There was briefly a version that NULLed `ranker` outright. Don't do that again: it
 destroys the record for no gain, since the men never had a route to it anyway.

@@ -617,6 +617,10 @@ textarea:focus-visible,
 .gridtable .rowhead span { display: block; padding: 0 10px; font-size: 12px; }
 .gridtable .cell { width: 40px; }
 .gridtable .self { box-shadow: inset 0 0 0 1px var(--flare); }
+.gridtable .tot { background-color: var(--ink-3); min-width: 46px; }
+.gridtable thead .tot { background-color: var(--ink-3); }
+.gridtable .gap-hi { color: var(--flare); font-weight: 600; }
+.gridtable .gap-lo { color: var(--cool, #4a7c8c); font-weight: 600; }
 
 .legend {
   display: flex;

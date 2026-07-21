@@ -531,17 +531,32 @@ function renderGrid() {
   }
 
   const rankers = ballots.map((b) => b.ranker).sort();
-  const rankees = tally(state.era).rows.map((r) => r.nick);
+  const stats = tally(state.era);
+  const rankees = stats.rows.map((r) => r.nick);
+  const avgOf = Object.fromEntries(stats.rows.map((r) => [r.nick, r.avg]));
+
   const at = (ranker, rankee) => {
     const b = ballots.find((x) => x.ranker === ranker);
     const i = b ? b.ranking.indexOf(rankee) : -1;
     return i === -1 ? null : i + 1;
   };
 
+  // Where he put himself, and how far that sits from where everyone else put
+  // him. Positive gap = he rates himself better than the group does.
+  const selfOf = (n) => at(n, n);
+  const gapOf = (n) => {
+    const self = selfOf(n);
+    return self === null || avgOf[n] == null ? null : avgOf[n] - self;
+  };
+
   const sorted = [...rankees].sort((a, b) => {
+    const key = state.gridSort;
     let av, bv;
-    if (state.gridSort === 'name') { av = a; bv = b; }
-    else { av = at(state.gridSort, a) ?? 99; bv = at(state.gridSort, b) ?? 99; }
+    if (key === 'name') { av = a; bv = b; }
+    else if (key === 'avg') { av = avgOf[a] ?? 99; bv = avgOf[b] ?? 99; }
+    else if (key === 'self') { av = selfOf(a) ?? 99; bv = selfOf(b) ?? 99; }
+    else if (key === 'gap') { av = -(gapOf(a) ?? -99); bv = -(gapOf(b) ?? -99); }
+    else { av = at(key, a) ?? 99; bv = at(key, b) ?? 99; }
     return av > bv ? state.gridDir : av < bv ? -state.gridDir : 0;
   });
 
@@ -554,6 +569,9 @@ function renderGrid() {
       <thead><tr>
         <th class="corner ${state.gridSort === 'name' ? 'sorted' : ''}"><button data-g="name">RANKEE${arrow('name')}</button></th>
         ${rankers.map((r) => `<th class="cell ${state.gridSort === r ? 'sorted' : ''}"><button data-g="${r}">${r}${arrow(r)}</button></th>`).join('')}
+        <th class="cell tot ${state.gridSort === 'avg' ? 'sorted' : ''}"><button data-g="avg">AVG${arrow('avg')}</button></th>
+        <th class="cell tot ${state.gridSort === 'self' ? 'sorted' : ''}"><button data-g="self">SELF${arrow('self')}</button></th>
+        <th class="cell tot ${state.gridSort === 'gap' ? 'sorted' : ''}"><button data-g="gap">GAP${arrow('gap')}</button></th>
       </tr></thead>
       <tbody>${sorted.map((rankee) => `
         <tr><th class="rowhead"><span>${rankee}</span></th>
@@ -562,11 +580,15 @@ function renderGrid() {
           if (v === null) return `<td class="cell" style="color:var(--line)">·</td>`;
           const c = lightFor(v, total, CARD);
           return `<td class="cell ${r === rankee ? 'self' : ''}" style="background-color:${rgb(c)};color:${readable(c)}">${v}</td>`;
-        }).join('')}</tr>`).join('')}
+        }).join('')}
+        <td class="cell tot">${avgOf[rankee] == null ? '—' : avgOf[rankee].toFixed(2)}</td>
+        <td class="cell tot">${selfOf(rankee) ?? '—'}</td>
+        <td class="cell tot ${gapClass(gapOf(rankee))}">${fmtGap(gapOf(rankee))}</td>
+        </tr>`).join('')}
       </tbody>
     </table></div>
     <div class="legend"><span>RANK 1</span><span class="legend-scale"></span><span>RANK ${total}</span>
-      <span style="margin-left:auto">RED OUTLINE = SELF-VOTE</span></div>`;
+      <span style="margin-left:auto">AVG EXCLUDES HIS SELF-VOTE · GAP = AVG − SELF, + MEANS HE FLATTERS HIMSELF</span></div>`;
 
   host.querySelectorAll('button[data-g]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -575,6 +597,19 @@ function renderGrid() {
       state.gridSort = k;
       renderGrid();
     }));
+}
+
+/** A gap of +6.3 means he put himself six places above where the group has him. */
+function fmtGap(g) {
+  if (g === null) return '—';
+  return `${g > 0 ? '+' : g < 0 ? '−' : ''}${Math.abs(g).toFixed(1)}`;
+}
+
+function gapClass(g) {
+  if (g === null) return '';
+  if (g >= 2) return 'gap-hi';
+  if (g <= -2) return 'gap-lo';
+  return '';
 }
 
 /* ─── Wiring ──────────────────────────────────────────────────────────── */
