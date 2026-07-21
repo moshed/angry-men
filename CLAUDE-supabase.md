@@ -33,7 +33,7 @@ dozen rows anyway.
 ```sql
 create table public.angry_submissions (
   id         uuid primary key default gen_random_uuid(),
-  ranker     text,                   -- who cast it; never served through the public view
+  ranker     text not null,          -- who cast it; never served through the public view
   ranking    text[] not null,        -- ordered funniest → least; index 0 is slot 1
   era        text not null default 'current',   -- 'current' (shown as 2026) or '2020'
   note       text,                   -- optional one-line defence, ≤280 chars, shown unattributed
@@ -105,6 +105,13 @@ once. When this was computed client-side the exclusion was silently impossible, 
 self-votes were counted for a while — the 2020 figures drifting off the spreadsheet
 (Mordy 2.4 instead of 2.4444) was the tell. **`angry_stats` for era `2020` should
 reproduce `12AM Humor.xlsx` exactly; if it doesn't, something has regressed.**
+
+**`ranker` is `NOT NULL`, and that is load-bearing.** `rankee IS DISTINCT FROM NULL`
+is always true, so a single NULL-ranker row silently switches the self-vote exclusion
+off for that ballot — no error, just a quietly inflated average. It happened once:
+a man voted during the window between restoring names and redeploying the function,
+his board landed with no name, and it read 7.14 instead of 8.17 because his own
+2nd-place vote for himself was being counted. The constraint makes that fail loudly.
 
 Side effect worth knowing: `n` is one lower for a man who has voted than for one who
 hasn't, which reveals *who* has voted. Not *what* they voted, and with no timestamps

@@ -470,11 +470,42 @@ textarea:focus-visible,
 
 .avg {
   margin-left: auto;
+  padding-left: 8px;
   font-family: var(--mono);
   font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+.move {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 2px;
+  white-space: nowrap;
+}
+
+.move.up   { color: var(--sodium); background-color: rgba(242, 160, 61, 0.14); }
+.move.down { color: var(--flare);  background-color: rgba(226, 81, 59, 0.14); }
+.move.flat { color: var(--dim); }
+.move.new  { color: var(--bone); background-color: rgba(255, 255, 255, 0.07); font-size: 9.5px; }
+
+.chase {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+  margin-bottom: 12px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--sodium);
+}
+
+.chase b { display: block; color: var(--bone); font-weight: 500; margin-bottom: 3px; }
+.chase.in { color: var(--dim); }
 
 /* Range bar: how far apart the group is on one man. */
 .range {

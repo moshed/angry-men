@@ -180,6 +180,19 @@ function initDrag() {
 
 /* ─── Identity ────────────────────────────────────────────────────────── */
 
+const idKey = () => `angry.id.${state.token}`;
+
+/** Last known answer for this token, so a return visit renders with no wait. */
+function useCachedIdentity() {
+  if (!state.token) return false;
+  try {
+    const c = JSON.parse(localStorage.getItem(idKey()) || 'null');
+    if (!c || !c.nick) return false;
+    Object.assign(state, { me: c.nick, voted: !!c.voted, deadline: c.deadline, checked: true });
+    return true;
+  } catch { return false; }
+}
+
 async function identify() {
   if (!state.token) { state.checked = true; return; }
   try {
@@ -190,10 +203,18 @@ async function identify() {
     state.deadline = data.deadline ?? null;
     state.closed = !!data.closed;
     state.checked = true;
+    // Only cache a real answer; a null nick must not be remembered as one.
+    if (data.nick) {
+      localStorage.setItem(idKey(), JSON.stringify({
+        nick: data.nick, voted: !!data.voted, deadline: data.deadline,
+      }));
+    } else {
+      localStorage.removeItem(idKey());
+    }
   } catch {
-    // A dead network is not a bad link — say so, and let a reload settle it.
-    state.me = null;
-    state.checked = 'error';
+    // A dead network is not a bad link. If we already knew who this is, stay
+    // put and say nothing; only complain when we have nothing to show.
+    if (!state.me) { state.me = null; state.checked = 'error'; }
   }
 }
 
@@ -288,6 +309,15 @@ async function load() {
   ]);
 }
 
+/** Where each man finished in 2020, for the movement column. */
+function ranks2020() {
+  const rows = state.stats
+    .filter((s) => s.era === '2020')
+    .map((s) => ({ nick: s.rankee, avg: Number(s.avg) }))
+    .sort((a, b) => a.avg - b.avg);
+  return Object.fromEntries(rows.map((r, i) => [r.nick, i + 1]));
+}
+
 /** Everything the page knows: totals, already stripped of self-votes. */
 function tally(era) {
   const rows = state.stats
@@ -333,9 +363,12 @@ function waiting(t) {
 
 function renderConsensus() {
   const t = tally(state.era);
+  const then = state.era === 'current' ? ranks2020() : {};
   const host = $('#consensus-list');
   const label = ERA_LABEL[state.era];
 
+  $('#consensus-hint').textContent =
+    state.era === 'current' ? '▲▼ is movement against where he finished in 2020.' : '';
   $('#consensus-sub').textContent = t.boards
     ? `${t.boards} secret board${t.boards === 1 ? '' : 's'} in for ${label}. A man's own vote for himself never counts toward his numbers.`
     : '';
@@ -357,6 +390,7 @@ function renderConsensus() {
           <div class="standing-top">
             <span class="nick">${r.nick}</span>
             <span class="real">${NAME_BY_NICK[r.nick] ?? ''}</span>
+            ${move(then, r.nick, i + 1)}
             <span class="avg">${r.avg === null ? '—' : r.avg.toFixed(2)}</span>
           </div>
           <div class="range">
@@ -379,6 +413,16 @@ function renderConsensus() {
     ? `<h3 class="minihed">What they said</h3>` +
       t.notes.map((n) => `<div class="said">“${n.replace(/</g, '&lt;')}”</div>`).join('')
     : '';
+}
+
+/** Movement against 2020: up is a promotion, so a smaller number is better. */
+function move(then, nick, now) {
+  if (!Object.keys(then).length) return '';
+  const was = then[nick];
+  if (!was) return `<span class="move new">NEW</span>`;
+  const d = was - now;
+  if (!d) return `<span class="move flat">—</span>`;
+  return `<span class="move ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
 }
 
 /* ─── Positions ───────────────────────────────────────────────────────── */
@@ -466,9 +510,15 @@ function renderGrid() {
   if (!state.admin) return;
   const host = $('#grid-host');
   const ballots = state.attributed.filter((b) => b.era === state.era && b.ranker);
+  const voted = new Set(ballots.map((b) => b.ranker));
+  const missing = DEFAULT_BOARD.filter((n) => !voted.has(n));
+  const chase = state.era !== 'current' ? '' : missing.length
+    ? `<div class="chase"><b>Still to vote — ${missing.length} of ${DEFAULT_BOARD.length}</b>
+         <span>${missing.join(' · ')}</span></div>`
+    : `<div class="chase in"><b>All ${DEFAULT_BOARD.length} boards are in.</b></div>`;
 
   if (!ballots.length) {
-    host.innerHTML = `<div class="empty">No attributed boards for ${ERA_LABEL[state.era]}.</div>`;
+    host.innerHTML = chase + `<div class="empty">No boards for ${ERA_LABEL[state.era]} yet.</div>`;
     return;
   }
 
@@ -490,7 +540,7 @@ function renderGrid() {
   const arrow = (k) => (state.gridSort === k ? (state.gridDir === 1 ? ' ↓' : ' ↑') : '');
   const total = rankees.length;
 
-  host.innerHTML = `
+  host.innerHTML = chase + `
     <div class="warn">Only visible with your admin link. Don't share this URL — it shows every man's board with his name on it.</div>
     <div class="scroller"><table class="gridtable">
       <thead><tr>
@@ -566,6 +616,7 @@ function init() {
       renderAll();
     }));
 
+  useCachedIdentity();
   renderIdentity();
   identify().then(renderIdentity);
   loadAdmin().then(renderGrid);
