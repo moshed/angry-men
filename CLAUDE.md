@@ -161,9 +161,9 @@ list drops focus to `<body>` and the keys then go dead after one press.
 else here.** A second `function move(then, nick, now)` — the ▲/▼-vs-2020 tag — was
 added later in the file, and the last declaration in a scope wins. Every drop and
 every arrow key silently called the wrong function, so rows lifted, followed the
-finger, and snapped back untouched: the ballot looked broken for about a week and
-nobody could re-rank. It's `movementTag()` now. Before adding a top-level function,
-check the name isn't already taken:
+finger, and snapped back untouched, so the ballot was dead from that deploy until
+the men reported it a couple of hours later. It's `movementTag()` now. Before adding
+a top-level function, check the name isn't already taken:
 
 ```bash
 grep -oE "^function [A-Za-z_$]+" app.js | sort | uniq -d   # must print nothing
