@@ -637,6 +637,11 @@ textarea:focus-visible,
 .gridtable th button:hover { color: var(--bone); }
 .gridtable th.sorted button { color: var(--sodium); }
 
+/* Fixed, not just a minimum. Every other column has a set width, so a name
+   column with only a min-width is the one elastic thing in the table and
+   absorbs the entire surplus once the grid breaks out to the window — leaving
+   a 600px-wide column of names and a squashed matrix. Pinning it hands the
+   slack to the figures instead, which is what anyone came here to read. */
 .gridtable .corner,
 .gridtable .rowhead {
   position: sticky;
@@ -644,7 +649,13 @@ textarea:focus-visible,
   z-index: 3;
   background-color: var(--ink-2);
   text-align: left;
-  min-width: 96px;
+  width: 148px;
+  min-width: 148px;
+}
+
+@media (max-width: 600px) {
+  .gridtable .corner,
+  .gridtable .rowhead { width: 112px; min-width: 112px; }
 }
 
 .gridtable thead .corner { z-index: 4; background-color: var(--ink-3); }
@@ -672,6 +683,26 @@ textarea:focus-visible,
 }
 .gridtable .cell { width: 40px; }
 .gridtable .self { box-shadow: inset 0 0 0 1px var(--flare); }
+
+/* Reading one man across every board: put the light on his row and take it off
+   everyone else's. Hover does it on a mouse — no JS, no click needed — and a
+   tap pins it on a phone, where there is no hover to lean on. */
+.gridtable tbody tr { transition: opacity 120ms ease; }
+
+.gridtable:not(.pinned) tbody:hover tr:not(:hover),
+.gridtable.pinned tbody tr:not(.lit) {
+  opacity: 0.2;
+}
+
+/* The row in the light keeps its own head fully bright even while the sticky
+   column sits above the dimmed ones. */
+.gridtable.pinned tbody tr.lit .rowhead,
+.gridtable tbody tr:hover .rowhead { color: var(--bone); }
+.gridtable.pinned tbody tr.lit .rowhead { box-shadow: inset 2px 0 0 var(--sodium); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gridtable tbody tr { transition: none; }
+}
 .gridtable .tot { background-color: var(--ink-3); min-width: 46px; }
 .gridtable thead .tot { background-color: var(--ink-3); }
 .gridtable .gap-hi { color: var(--flare); font-weight: 600; }
@@ -696,6 +727,18 @@ textarea:focus-visible,
 }
 
 .legend-scale.rev { background-image: linear-gradient(90deg, var(--slot-dark), var(--sodium)); }
+
+/* The grid is the one thing here that can't live inside a 760px column: a
+   column per voter plus three totals runs past 800px once everyone is in.
+   Once there's room, it breaks out of the wrap and uses the window, so a
+   desktop reader gets the whole matrix without dragging it sideways. The
+   inset keeps it clear of a classic (non-overlay) scrollbar. */
+@media (min-width: 800px) {
+  #panel-grid {
+    width: calc(100vw - 34px);
+    margin-left: calc(50% - 50vw + 17px);
+  }
+}
 
 .warn {
   border: 1px solid rgba(226, 81, 59, 0.5);

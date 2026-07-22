@@ -128,6 +128,26 @@ There was briefly a version that NULLed `ranker` outright. Don't do that again: 
 destroys the record for no gain, since the men never had a route to it anyway.
 (It was recoverable only because `angry_voters.ballot_id` had been written first.)
 
+## The grid (runner's eyes only)
+
+- **It breaks out of the 760px wrap above 800px.** A column per voter plus three
+  totals runs past 1000px with everyone in, and the whole point of this tab is
+  reading the matrix at once. `#panel-grid` goes full-window with a 17px inset so
+  a classic scrollbar can't push the page sideways; the `.scroller` is still there
+  as the phone fallback.
+- **The name column has a fixed width, not just a `min-width`.** Every other column
+  is sized, so an elastic name column is the only thing that can absorb the surplus
+  once the table is 1400px wide — it grabbed ~600px and squashed the figures.
+- **Hover isolates a row, tap pins it.** Hover is pure CSS (`tbody:hover
+  tr:not(:hover)` dims to 0.2); the tap path sets `state.gridLit` and a `.pinned`
+  class, because a phone has no hover and reading one man across fourteen columns
+  is what this tab is for. `gridLit` lives in state, so a re-sort keeps the light on.
+- **Cells are the rank each vote *counted as* (1–13), not the raw board position.**
+  A man's own cell shows where he put himself, outlined and unlit, and is the one
+  number on the page not on the counted scale. This is load-bearing: **every row's
+  cells must average to its AVG**, or the runner is reading a table that doesn't
+  add up. There's a Playwright check for exactly that in the scratch harness.
+
 ## Design notes
 
 Direction is a **fantasy draft big board** — the group's own vernacular (the source

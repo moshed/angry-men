@@ -30,6 +30,7 @@ const state = {
   conDir: 1,
   gridSort: 'name',
   gridDir: 1,
+  gridLit: null,          // the rankee whose row is being read across
   token: new URLSearchParams(location.search).get('k'),
   // Present only in the runner's own URL. Everything it unlocks is fetched
   // from the edge function, which re-checks it — the flag alone grants nothing.
@@ -699,15 +700,25 @@ function renderGrid() {
   const places = placesFor(stats.rows);
   const avgOf = Object.fromEntries(stats.rows.map((r) => [r.nick, r.avg]));
 
+  const boardOf = (ranker) => ballots.find((x) => x.ranker === ranker)?.ranking ?? null;
+
+  /** What that vote actually COUNTED as — the board renumbered 1–13 with its
+   *  own voter lifted out. It has to match the arithmetic, or the AVG column
+   *  isn't the mean of the row the runner is looking at. */
   const at = (ranker, rankee) => {
-    const b = ballots.find((x) => x.ranker === ranker);
-    const i = b ? b.ranking.indexOf(rankee) : -1;
+    const b = boardOf(ranker);
+    if (!b || ranker === rankee) return null;
+    const i = b.filter((m) => m !== ranker).indexOf(rankee);
     return i === -1 ? null : i + 1;
   };
 
-  // Where he put himself, and how far that sits from where everyone else put
-  // him. Positive gap = he rates himself better than the group does.
-  const selfOf = (n) => at(n, n);
+  // Where he put himself, on his board as cast — the one number here that is
+  // deliberately NOT on the counted scale, because it counts for nothing.
+  const selfOf = (n) => {
+    const b = boardOf(n);
+    const i = b ? b.indexOf(n) : -1;
+    return i === -1 ? null : i + 1;
+  };
   const gapOf = (n) => {
     const self = selfOf(n);
     return self === null || avgOf[n] == null ? null : avgOf[n] - self;
@@ -725,11 +736,12 @@ function renderGrid() {
   });
 
   const arrow = (k) => (state.gridSort === k ? (state.gridDir === 1 ? ' ↓' : ' ↑') : '');
-  const total = rankees.length;
+  const total = rankees.length;      // 14 — the field, and the place badges
+  const counted = total - 1;         // 13 — the scale every counted vote is on
 
   host.innerHTML = chase + `
     <div class="warn">Only visible with your admin link. Don't share this URL — it shows every man's board with his name on it.</div>
-    <div class="scroller"><table class="gridtable">
+    <div class="scroller"><table class="gridtable${state.gridLit ? ' pinned' : ''}">
       <thead><tr>
         <th class="corner ${state.gridSort === 'name' ? 'sorted' : ''}"><button data-g="name">RANKEE${arrow('name')}</button></th>
         ${rankers.map((r) => `<th class="cell ${state.gridSort === r ? 'sorted' : ''}"><button data-g="${r}">${r}${arrow(r)}</button></th>`).join('')}
@@ -738,12 +750,19 @@ function renderGrid() {
         <th class="cell tot ${state.gridSort === 'gap' ? 'sorted' : ''}"><button data-g="gap">GAP${arrow('gap')}</button></th>
       </tr></thead>
       <tbody>${sorted.map((rankee) => `
-        <tr><th class="rowhead"><span>${placeBadge(places[rankee], total)}${rankee}</span></th>
+        <tr data-rankee="${rankee}" class="${state.gridLit === rankee ? 'lit' : ''}"><th class="rowhead"><span>${placeBadge(places[rankee], total)}${rankee}</span></th>
         ${rankers.map((r) => {
+          // His own column, on his own row: the vote that counts for nothing.
+          // Show where he put himself, outlined and unlit, so the row's other
+          // cells are exactly the numbers AVG is the mean of.
+          if (r === rankee) {
+            const s = selfOf(r);
+            return `<td class="cell self" title="Where ${r} put himself — not counted">${s ?? '·'}</td>`;
+          }
           const v = at(r, rankee);
           if (v === null) return `<td class="cell" style="color:var(--line)">·</td>`;
-          const c = lightFor(v, total, CARD);
-          return `<td class="cell ${r === rankee ? 'self' : ''}" style="background-color:${rgb(c)};color:${readable(c)}">${v}</td>`;
+          const c = lightFor(v, counted, CARD);
+          return `<td class="cell" style="background-color:${rgb(c)};color:${readable(c)}">${v}</td>`;
         }).join('')}
         <td class="cell tot">${avgOf[rankee] == null ? '—' : avgOf[rankee].toFixed(2)}</td>
         <td class="cell tot">${selfOf(rankee) ?? '—'}</td>
@@ -751,10 +770,23 @@ function renderGrid() {
         </tr>`).join('')}
       </tbody>
     </table></div>
-    <div class="legend"><span>RANK 1</span><span class="legend-scale"></span><span>RANK ${total}</span>
-      <span style="margin-left:auto">AVG EXCLUDES HIS SELF-VOTE · GAP = AVG − SELF, + MEANS HE FLATTERS HIMSELF</span></div>`;
+    <div class="legend"><span>RANK 1</span><span class="legend-scale"></span><span>RANK ${counted}</span>
+      <span style="margin-left:auto">CELLS ARE THE RANK EACH VOTE COUNTED AS, 1–${counted} · THE OUTLINED CELL IS HIS OWN VOTE FOR HIMSELF AND COUNTS FOR NOTHING · AVG IS THE MEAN OF THE REST · GAP = AVG − SELF, + MEANS HE FLATTERS HIMSELF</span></div>`;
 
   paintPlaces(host);
+
+  // Tap a man to hold the light on his row — hover does the same on a mouse,
+  // but a phone has no hover, and reading one man across fourteen columns is
+  // exactly what this tab is for. Tapping him again, or anything else, clears.
+  const table = host.querySelector('.gridtable');
+  host.querySelectorAll('tbody tr[data-rankee]').forEach((tr) =>
+    tr.addEventListener('click', () => {
+      const nick = tr.dataset.rankee;
+      state.gridLit = state.gridLit === nick ? null : nick;
+      host.querySelectorAll('tbody tr[data-rankee]').forEach((r) =>
+        r.classList.toggle('lit', r.dataset.rankee === state.gridLit));
+      table.classList.toggle('pinned', !!state.gridLit);
+    }));
 
   host.querySelectorAll('button[data-g]').forEach((btn) =>
     btn.addEventListener('click', () => {
