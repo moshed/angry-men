@@ -696,7 +696,9 @@ footer {
 @media (max-width: 420px) {
   .slot { flex: 0 0 46px; font-size: 17px; }
   .nick { font-size: 22px; }
-  .grip { flex: 0 0 34px; }
+  /* Wider on a phone, not narrower: on touch this is the ONLY way to grab a
+     row, and 34px is under the 44px minimum for a fingertip. */
+  .grip { flex: 0 0 52px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

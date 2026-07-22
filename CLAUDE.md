@@ -153,7 +153,25 @@ still scrolls normally under a finger. Making the whole row grabbable on touch m
 the list unscrollable on a phone, which is where nearly all of these get filled in.
 
 Reordering assumes uniform row height (`--row-h` + 5px margin). Change one, change
-the other. Keyboard: focus a row, ArrowUp/ArrowDown to move it.
+the other. Keyboard: focus a row, ArrowUp/ArrowDown to move it — `move()` restores
+focus to the moved row afterwards, checked *before* the re-render, since wiping the
+list drops focus to `<body>` and the keys then go dead after one press.
+
+**`move(from, to)` is a global function in a plain script, and so is everything
+else here.** A second `function move(then, nick, now)` — the ▲/▼-vs-2020 tag — was
+added later in the file, and the last declaration in a scope wins. Every drop and
+every arrow key silently called the wrong function, so rows lifted, followed the
+finger, and snapped back untouched: the ballot looked broken for about a week and
+nobody could re-rank. It's `movementTag()` now. Before adding a top-level function,
+check the name isn't already taken:
+
+```bash
+grep -oE "^function [A-Za-z_$]+" app.js | sort | uniq -d   # must print nothing
+```
+
+The grip is the only way to drag on touch, so it's **wider** on a phone (52px), not
+narrower — it was 34px, under the 44px fingertip minimum, on the device where nearly
+every board actually gets filled in.
 
 ## Performance
 

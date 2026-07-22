@@ -104,12 +104,20 @@ function renderBoard() {
 function move(from, to) {
   if (to < 0 || to >= state.board.length || to === from) return;
   state.touched = true;
+  // Ask before re-rendering: renderBoard() wipes the list, which always drops
+  // focus to <body>. Asking afterwards meant the arrow keys moved a man once
+  // and then went dead, because nothing was focused any more.
+  const rowsNow = [...$('#board').children].filter((n) => n.classList.contains('row'));
+  const hadFocus = document.activeElement === rowsNow[from];
+
   const [man] = state.board.splice(from, 1);
   state.board.splice(to, 0, man);
   renderBoard();
   flashDelta(to, from - to);
-  const row = $('#board').children[to];
-  if (document.activeElement !== document.body) row.focus();
+  if (hadFocus) {
+    const rows = [...$('#board').children].filter((n) => n.classList.contains('row'));
+    rows[to]?.focus();
+  }
 }
 
 function flashDelta(index, change) {
@@ -446,7 +454,7 @@ function renderConsensus() {
           <div class="standing-top">
             <span class="nick">${r.nick}</span>
             <span class="real">${NAME_BY_NICK[r.nick] ?? ''}</span>
-            ${move(then, r.nick, i + 1)}
+            ${movementTag(then, r.nick, i + 1)}
             <span class="avg">${r.avg === null ? '—' : r.avg.toFixed(2)}</span>
           </div>
           <div class="range">
@@ -471,8 +479,11 @@ function renderConsensus() {
     : '';
 }
 
-/** Movement against 2020: up is a promotion, so a smaller number is better. */
-function move(then, nick, now) {
+/** Movement against 2020: up is a promotion, so a smaller number is better.
+ *  Named `move` once, which silently replaced the ballot's `move(from, to)` —
+ *  two function declarations, one global scope, last one wins — and killed
+ *  drag and the arrow keys for a week. Keep these names apart. */
+function movementTag(then, nick, now) {
   if (!Object.keys(then).length) return '';
   const was = then[nick];
   if (!was) return `<span class="move new">NEW</span>`;
