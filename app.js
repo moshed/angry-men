@@ -640,7 +640,7 @@ function renderPositions() {
           return `<td class="cell" style="background-color:${rgb(col)};color:${readable(col)}">${c}</td>`;
         })
         .join('');
-      return `<tr><th class="rowhead"><span>${placeBadge(places[r.nick], span)}${r.nick}</span></th>${cells}<td class="cell">${r.avg.toFixed(1)}</td></tr>`;
+      return `<tr><th class="rowhead"><span>${placeBadge(places[r.nick], span)}${r.nick}</span></th>${cells}<td class="cell">${r.avg.toFixed(2)}</td></tr>`;
     })
     .join('');
 
