@@ -142,6 +142,20 @@ has a `Rank | Pitcher | Diff` layout).
 - On drop, the moved row prints a `▲n` / `▼n` reach-or-steal callout, the one
   animated moment on the page. Respects `prefers-reduced-motion`.
 
+## Tabs are in the URL
+
+`…/angry-men/#board`, `#consensus`, `#positions`, `#grid`. Clicking a tab pushes
+the hash, so a reload keeps you where you were, the back button walks the tabs,
+and a link can point at one ("look at Positions").
+
+- **The hash is never a panel's element id** (`panel-consensus`, not `consensus`),
+  or the browser would scroll-jump on every tab change.
+- **A voting link keeps its `?k=`** — the hash is appended to the query, never
+  swapped for it. `…/?k=…#positions` still identifies the man.
+- `#grid` is refused unless `state.admin`, so a stray link can't strand a man on
+  an empty tab. It's checked twice: once at load, then again after `loadAdmin()`
+  answers, since the token hasn't been ruled on yet the first time.
+
 ## The consensus table
 
 Seven columns — `#`, MAN, `±PL`, AVG, `±AVG`, BEST, WORST — every head sorts. It

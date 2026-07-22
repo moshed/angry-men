@@ -776,9 +776,29 @@ function gapClass(g) {
 
 /* ─── Wiring ──────────────────────────────────────────────────────────── */
 
-function show(name) {
+/* Tabs live in the URL: …/angry-men/#consensus. A man can send "look at the
+   positions" as a link, a reload keeps him where he was, and the back button
+   walks the tabs. The hash is deliberately NOT any panel's element id, so the
+   browser never scroll-jumps when it changes. A voting link keeps its ?k= —
+   the hash is appended, never replaces the query. */
+const PANELS = ['board', 'consensus', 'positions', 'grid'];
+
+function show(name, push = true) {
   $$('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.panel === name)));
   $$('.panel').forEach((p) => p.classList.toggle('on', p.id === `panel-${name}`));
+  if (push && location.hash.slice(1) !== name) {
+    history.pushState(null, '', `${location.pathname}${location.search}#${name}`);
+  }
+}
+
+/** The tab named in the URL, if it's real and the reader is allowed it. */
+function panelFromHash() {
+  const name = decodeURIComponent(location.hash.slice(1));
+  if (!PANELS.includes(name)) return null;
+  // The grid link is useless without the admin token, and quietly landing a
+  // man on an empty tab is worse than putting him on the ballot.
+  if (name === 'grid' && !state.admin) return null;
+  return name;
 }
 
 function renderAll() {
@@ -815,6 +835,16 @@ function init() {
   });
 
   $$('.tab').forEach((t) => t.addEventListener('click', () => show(t.dataset.panel)));
+
+  // Back/forward walks the tabs. `false` so restoring a tab doesn't push a
+  // fresh entry on top of the one we just navigated to.
+  addEventListener('popstate', () => show(panelFromHash() ?? 'board', false));
+  addEventListener('hashchange', () => show(panelFromHash() ?? 'board', false));
+
+  // A tab named in the URL wins over the default, but only once — the grid is
+  // still hidden until loadAdmin() rules on the token, and it re-checks then.
+  const asked = panelFromHash();
+  if (asked) show(asked, false);
   $$('.chip').forEach((c) =>
     c.addEventListener('click', () => {
       state.era = c.dataset.era;
@@ -830,7 +860,11 @@ function init() {
   renderIdentity();
   identify().then(renderIdentity);
   fetchMyBoard();
-  loadAdmin().then(renderGrid);
+  loadAdmin().then(() => {
+    renderGrid();
+    // #grid was refused before the token was checked; honour it now that it is.
+    if (state.admin && location.hash.slice(1) === 'grid') show('grid', false);
+  });
 
   load()
     .then(() => {
