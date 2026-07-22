@@ -144,13 +144,17 @@ has a `Rank | Pitcher | Diff` layout).
 
 ## The consensus table
 
-Seven columns — `#`, MAN, `±` (vs 2020), AVG, BEST, WORST, N — every head sorts.
-It replaced a stack of cards with range bars, which was three phone-screens tall
-and couldn't be sorted at all.
+Six columns — `#`, MAN, `±` (vs 2020), AVG, BEST, WORST — every head sorts. It
+replaced a stack of cards with range bars, which was three phone-screens tall and
+couldn't be sorted at all. There was briefly an `N` (boards counted) column; it was
+noise on a phone, and the ballot count is already in the line above the table.
 
-- **The `#` travels with the man.** It's his finish by average, not the row index,
-  so sorting by WORST doesn't renumber the board. It's also what the slot's light
-  is painted from, which is what keeps the finishing order legible under any sort.
+- **The `#` travels with the man, on every tab.** It's his finish by average, not
+  the row index, so sorting by WORST doesn't renumber the board. `placesFor()`
+  builds the map and `placeBadge()` renders it, so Consensus, Positions and Grid
+  all label a man with the same number — and it's painted on the same sodium scale
+  as his slot on the ballot, which is what keeps the finishing order legible under
+  any sort.
 - `#` and AVG are the same sort (the place *is* the average), so only AVG shows the
   arrow. Two arrows on one ordering reads like two different sorts.
 - **It is deliberately not inside a `.scroller`**, unlike Positions and Grid. A

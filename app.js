@@ -411,6 +411,20 @@ function tally(era) {
   };
 }
 
+/** Finishing place by average, nick → 1…14. The same number labels a man on
+ *  every tab, so a row means the same thing wherever you're reading it — and
+ *  it never changes when a table is re-sorted by something else. */
+const placesFor = (rows) => Object.fromEntries(rows.map((r, i) => [r.nick, i + 1]));
+
+/** The place badge that sits before a name in the Positions and Grid tables.
+ *  Painted after insertion by `paintPlaces`, same sodium scale as the ballot. */
+const placeBadge = (place, total) =>
+  `<i class="pl" data-rank="${place}" data-total="${total}">${String(place).padStart(2, '0')}</i>`;
+
+const paintPlaces = (host) =>
+  host.querySelectorAll('.pl').forEach((el) =>
+    paintSlot(el, +el.dataset.rank, +el.dataset.total));
+
 /** Below the threshold an average is just one man's ballot, read aloud. */
 const tooFew = (t) => state.era === 'current' && t.boards < MIN_BALLOTS;
 
@@ -492,7 +506,6 @@ function renderConsensus() {
         ${th('avg', 'AVG', 'num', 'Average slot across every board')}
         ${th('best', 'BEST', 'num', 'His best slot on any board')}
         ${th('worst', 'WORST', 'num', 'His worst slot on any board')}
-        ${th('n', 'N', 'num', 'Boards counted — his own vote for himself is excluded')}
       </tr></thead>
       <tbody>${sorted.map((r) => `
         <tr>
@@ -504,7 +517,6 @@ function renderConsensus() {
           <td class="num avg">${r.avg === null ? '—' : r.avg.toFixed(2)}</td>
           <td class="num">${r.best ?? '—'}</td>
           <td class="num">${r.worst ?? '—'}</td>
-          <td class="num dim">${r.n}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
@@ -556,6 +568,7 @@ function renderPositions() {
   }
 
   const span = t.rows.length;
+  const places = placesFor(t.rows);
   const slots = Array.from({ length: span }, (_, i) => i + 1);
   const peak = Math.max(1, ...t.rows.flatMap((r) => Object.values(r.counts)));
 
@@ -587,7 +600,7 @@ function renderPositions() {
           return `<td class="cell" style="background-color:${rgb(col)};color:${readable(col)}">${c}</td>`;
         })
         .join('');
-      return `<tr><th class="rowhead"><span>${r.nick}</span></th>${cells}<td class="cell">${r.avg.toFixed(1)}</td></tr>`;
+      return `<tr><th class="rowhead"><span>${placeBadge(places[r.nick], span)}${r.nick}</span></th>${cells}<td class="cell">${r.avg.toFixed(1)}</td></tr>`;
     })
     .join('');
 
@@ -595,6 +608,8 @@ function renderPositions() {
     <div class="scroller"><table class="gridtable"><thead>${head}</thead><tbody>${body}</tbody></table></div>
     <div class="legend"><span>FEW</span><span class="legend-scale rev"></span><span>MANY</span>
       <span style="margin-left:auto">BOARDS THAT PUT HIM THERE · SELF-VOTES EXCLUDED</span></div>`;
+
+  paintPlaces(host);
 
   host.querySelectorAll('button[data-sort]').forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -641,6 +656,7 @@ function renderGrid() {
   const rankers = ballots.map((b) => b.ranker).sort();
   const stats = tally(state.era);
   const rankees = stats.rows.map((r) => r.nick);
+  const places = placesFor(stats.rows);
   const avgOf = Object.fromEntries(stats.rows.map((r) => [r.nick, r.avg]));
 
   const at = (ranker, rankee) => {
@@ -682,7 +698,7 @@ function renderGrid() {
         <th class="cell tot ${state.gridSort === 'gap' ? 'sorted' : ''}"><button data-g="gap">GAP${arrow('gap')}</button></th>
       </tr></thead>
       <tbody>${sorted.map((rankee) => `
-        <tr><th class="rowhead"><span>${rankee}</span></th>
+        <tr><th class="rowhead"><span>${placeBadge(places[rankee], total)}${rankee}</span></th>
         ${rankers.map((r) => {
           const v = at(r, rankee);
           if (v === null) return `<td class="cell" style="color:var(--line)">·</td>`;
@@ -697,6 +713,8 @@ function renderGrid() {
     </table></div>
     <div class="legend"><span>RANK 1</span><span class="legend-scale"></span><span>RANK ${total}</span>
       <span style="margin-left:auto">AVG EXCLUDES HIS SELF-VOTE · GAP = AVG − SELF, + MEANS HE FLATTERS HIMSELF</span></div>`;
+
+  paintPlaces(host);
 
   host.querySelectorAll('button[data-g]').forEach((btn) =>
     btn.addEventListener('click', () => {
