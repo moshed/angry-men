@@ -144,7 +144,7 @@ has a `Rank | Pitcher | Diff` layout).
 
 ## The consensus table
 
-Six columns — `#`, MAN, `±` (vs 2020), AVG, BEST, WORST — every head sorts. It
+Seven columns — `#`, MAN, `±PL`, AVG, `±AVG`, BEST, WORST — every head sorts. It
 replaced a stack of cards with range bars, which was three phone-screens tall and
 couldn't be sorted at all. There was briefly an `N` (boards counted) column; it was
 noise on a phone, and the ballot count is already in the line above the table.
@@ -165,7 +165,13 @@ noise on a phone, and the ballot count is already in the line above the table.
   add a column, re-measure at 320px.**
 - The heads stick at `top: 55px`, clearing the sticky tab bar. Change the height of
   `.tabs` and that number has to move with it.
-- The `2020` era has no `±` column — there's nothing to compare against.
+- **Two movement columns, because they disagree.** `±PL` is places gained on 2020,
+  `±AVG` is what his average did. A man can hold his place while the group quietly
+  cools on him — Elisha was flat at `±PL` while `±AVG` had him ▼0.76 — and places
+  also shift underneath a man when the two unseeded arrivals land above him.
+  **Up is funnier in both**, so `±AVG` flips the sign: a *falling* average is a
+  rising man, and it's drawn with ▲ like the places tag rather than as `−0.76`.
+- The `2020` era has neither `±` column — there's nothing to compare against.
 
 ## Drag implementation
 

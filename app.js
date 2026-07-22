@@ -384,6 +384,14 @@ function ranks2020() {
   return Object.fromEntries(rows.map((r, i) => [r.nick, i + 1]));
 }
 
+/** His 2020 average, to sit against the one he's carrying now. */
+function avgs2020() {
+  return Object.fromEntries(
+    state.stats
+      .filter((s) => s.era === '2020')
+      .map((s) => [s.rankee, Number(s.avg)]));
+}
+
 /** Everything the page knows: totals, already stripped of self-votes. */
 function tally(era) {
   const rows = state.stats
@@ -444,12 +452,15 @@ function waiting(t) {
 function renderConsensus() {
   const t = tally(state.era);
   const then = state.era === 'current' ? ranks2020() : {};
+  const thenAvg = state.era === 'current' ? avgs2020() : {};
   const host = $('#consensus-list');
   const label = ERA_LABEL[state.era];
 
   $('#consensus-hint').textContent =
     `Tap a column head to sort. ${
-      state.era === 'current' ? '± is movement against where he finished in 2020.' : ''}`;
+      state.era === 'current'
+        ? '±PL is places gained on 2020, ±AVG is what his average did. Up is funnier in both.'
+        : ''}`;
   $('#consensus-sub').textContent = t.boards
     ? `${t.boards} secret board${t.boards === 1 ? '' : 's'} in for ${label}. A man's own vote for himself never counts toward his numbers.`
     : '';
@@ -476,6 +487,11 @@ function renderConsensus() {
       av = then[a.nick] ? then[a.nick] - a.place : -99;
       bv = then[b.nick] ? then[b.nick] - b.place : -99;
       av = -av; bv = -bv;                       // biggest climb first
+    } else if (k === 'moveavg') {
+      // A falling average is a rising man, so the sign is flipped to keep
+      // "first row = most improved" the same as the places column.
+      av = deltaAvg(thenAvg, a) ?? 99;
+      bv = deltaAvg(thenAvg, b) ?? 99;
     } else {
       av = a[k] ?? 99; bv = b[k] ?? 99;
     }
@@ -502,8 +518,9 @@ function renderConsensus() {
       <thead><tr>
         ${th('avg', '#', 'place', 'Where he finished', false)}
         ${th('name', 'MAN', 'man')}
-        ${movementCol ? th('move', '±', 'num', 'Movement against 2020') : ''}
+        ${movementCol ? th('move', '±PL', 'num', 'Places gained or lost against 2020') : ''}
         ${th('avg', 'AVG', 'num', 'Average slot across every board')}
+        ${movementCol ? th('moveavg', '±AVG', 'num', 'How his average moved since 2020') : ''}
         ${th('best', 'BEST', 'num', 'His best slot on any board')}
         ${th('worst', 'WORST', 'num', 'His worst slot on any board')}
       </tr></thead>
@@ -515,6 +532,7 @@ function renderConsensus() {
             NAME_BY_NICK[r.nick] ?? ''}</span></td>
           ${movementCol ? `<td class="num">${movementTag(then, r.nick, r.place)}</td>` : ''}
           <td class="num avg">${r.avg === null ? '—' : r.avg.toFixed(2)}</td>
+          ${movementCol ? `<td class="num">${avgTag(thenAvg, r)}</td>` : ''}
           <td class="num">${r.best ?? '—'}</td>
           <td class="num">${r.worst ?? '—'}</td>
         </tr>`).join('')}
@@ -538,6 +556,24 @@ function renderConsensus() {
     ? `<h3 class="minihed">What they said</h3>` +
       t.notes.map((n) => `<div class="said">“${n.replace(/</g, '&lt;')}”</div>`).join('')
     : '';
+}
+
+/** How far his average moved since 2020. Negative is an improvement — a lower
+ *  average means the group put him nearer slot 1 — so this returns the raw
+ *  difference and the caller flips the sign for display. */
+function deltaAvg(thenAvg, row) {
+  const was = thenAvg[row.nick];
+  if (was == null || row.avg == null) return null;
+  return row.avg - was;
+}
+
+/** ±AVG, drawn like the places tag so both columns read "up is funnier". */
+function avgTag(thenAvg, row) {
+  const d = deltaAvg(thenAvg, row);
+  if (d === null) return `<span class="move new">NEW</span>`;
+  if (Math.abs(d) < 0.005) return `<span class="move flat">—</span>`;
+  return `<span class="move ${d < 0 ? 'up' : 'down'}">${d < 0 ? '▲' : '▼'}${
+    Math.abs(d).toFixed(2)}</span>`;
 }
 
 /** Movement against 2020: up is a promotion, so a smaller number is better.
