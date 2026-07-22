@@ -142,6 +142,27 @@ has a `Rank | Pitcher | Diff` layout).
 - On drop, the moved row prints a `▲n` / `▼n` reach-or-steal callout, the one
   animated moment on the page. Respects `prefers-reduced-motion`.
 
+## The consensus table
+
+Seven columns — `#`, MAN, `±` (vs 2020), AVG, BEST, WORST, N — every head sorts.
+It replaced a stack of cards with range bars, which was three phone-screens tall
+and couldn't be sorted at all.
+
+- **The `#` travels with the man.** It's his finish by average, not the row index,
+  so sorting by WORST doesn't renumber the board. It's also what the slot's light
+  is painted from, which is what keeps the finishing order legible under any sort.
+- `#` and AVG are the same sort (the place *is* the average), so only AVG shows the
+  arrow. Two arrows on one ordering reads like two different sorts.
+- **It is deliberately not inside a `.scroller`**, unlike Positions and Grid. A
+  horizontally scrollable ancestor is what `position: sticky` resolves against, and
+  that would kill the sticky column heads — which are the whole point on a phone.
+  It fits instead: verified 300–430px, with `.man` on the `max-width: 0; width: 99%`
+  trick so the names ellipsis away before any figure is pushed off screen. **If you
+  add a column, re-measure at 320px.**
+- The heads stick at `top: 55px`, clearing the sticky tab bar. Change the height of
+  `.tabs` and that number has to move with it.
+- The `2020` era has no `±` column — there's nothing to compare against.
+
 ## Drag implementation
 
 Hand-rolled pointer-events sortable in `initDrag()` — no library.

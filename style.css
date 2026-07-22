@@ -443,38 +443,117 @@ textarea:focus-visible,
 
 .chip[aria-pressed='true'] { color: var(--sodium); border-color: var(--sodium); }
 
-.standing {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 0;
+/* ─── Consensus: one table, readable on a phone ─────────────────────────
+   Seven columns fit inside 360px, so nothing has to scroll sideways on the
+   device where this actually gets read. The head is sticky and every column
+   sorts. The slot keeps its light, so the finishing order stays legible even
+   when the rows are sorted by something else. */
+
+.standings {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.standings th,
+.standings td {
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.standings thead th {
+  position: sticky;
+  /* Below the sticky tab bar, not under it — .tabs is 55px and z-index 30. */
+  top: 55px;
+  z-index: 2;
+  background-color: var(--ink-2);
   border-bottom: 1px solid var(--line);
 }
 
-.standing .slot {
-  flex: 0 0 40px;
-  height: 40px;
-  border-radius: var(--radius);
-  font-size: 16px;
+.standings th button {
+  width: 100%;
+  padding: 9px 7px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  color: var(--dim);
+  background: none;
+  border: 0;
+  text-align: right;
+  cursor: pointer;
 }
 
-.standing-body { flex: 1; min-width: 0; }
+.standings th button:hover { color: var(--bone); }
+.standings th.sorted button { color: var(--sodium); }
+.standings th.man button { text-align: left; }
+.standings th.place button { padding-left: 10px; text-align: center; }
 
-.standing-top {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
+.standings td { padding: 7px 7px; font-size: 14px; }
+.standings tbody tr:last-child td { border-bottom: 0; }
 
-.standing-top .nick { font-size: 22px; }
+.standings .place { width: 44px; padding-left: 10px; text-align: center; }
 
-.avg {
-  margin-left: auto;
-  padding-left: 8px;
-  font-family: var(--mono);
-  font-size: 18px;
+.standings .place .slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  border-radius: 3px;
+  font-size: 12px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+}
+
+/* max-width:0 with width:99% is the table trick that lets one column take the
+   leftover space AND shrink below its content — so the names ellipsis away
+   before the figures ever get pushed off the screen. */
+.standings .man {
+  width: 99%;
+  max-width: 0;
+  text-align: left;
+  padding-left: 9px;
+  overflow: hidden;
+}
+
+.standings .man .nick,
+.standings .man .real {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.standings .man .nick { font-size: 19px; line-height: 1.05; }
+.standings .man .real {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--dim);
+}
+
+.standings .num { font-size: 13px; }
+.standings .avg { font-size: 15px; font-weight: 600; color: var(--bone); }
+.standings .dim { color: var(--dim); }
+
+/* Phones: tighten until all seven columns clear the viewport. Measured at
+   390px (iPhone 14/15/16) — the table must not need a sideways scroll. */
+@media (max-width: 430px) {
+  .standings td { padding: 7px 4px; }
+  .standings th button { padding: 9px 4px; letter-spacing: 0.02em; }
+  .standings .place { width: 38px; padding-left: 6px; }
+  .standings .man { padding-left: 7px; }
+  .standings .man .nick { font-size: 17px; }
+  .standings .man .real { font-size: 10px; }
+}
+
+/* The oldest phones (SE, 320px): the real name is the one thing here nobody
+   needs — they know who Nugsy is. Drop it rather than scroll sideways. */
+@media (max-width: 345px) {
+  .standings .man .real { display: none; }
+  .standings .man .nick { font-size: 16px; }
 }
 
 .move {
@@ -506,51 +585,6 @@ textarea:focus-visible,
 
 .chase b { display: block; color: var(--bone); font-weight: 500; margin-bottom: 3px; }
 .chase.in { color: var(--dim); }
-
-/* Range bar: how far apart the group is on one man. */
-.range {
-  position: relative;
-  height: 4px;
-  margin-top: 9px;
-  background-color: var(--ink-3);
-  border-radius: 2px;
-}
-
-.range-bar {
-  position: absolute;
-  top: 0;
-  height: 4px;
-  background-color: rgba(242, 160, 61, 0.35);
-  border-radius: 2px;
-}
-
-.range-tick {
-  position: absolute;
-  top: -3px;
-  width: 2px;
-  height: 10px;
-  background-color: var(--sodium);
-}
-
-.range-self {
-  position: absolute;
-  top: -3px;
-  width: 2px;
-  height: 10px;
-  background-color: var(--flare);
-}
-
-.meta {
-  display: flex;
-  gap: 14px;
-  margin-top: 7px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--dim);
-  flex-wrap: wrap;
-}
-
-.meta .ego { color: var(--flare); }
 
 /* ─── The grid ──────────────────────────────────────────────────────────── */
 

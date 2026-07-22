@@ -26,6 +26,8 @@ const state = {
   era: 'current',
   sortBy: 'avg',
   sortDir: 1,
+  conSort: 'avg',
+  conDir: 1,
   gridSort: 'name',
   gridDir: 1,
   token: new URLSearchParams(location.search).get('k'),
@@ -432,7 +434,8 @@ function renderConsensus() {
   const label = ERA_LABEL[state.era];
 
   $('#consensus-hint').textContent =
-    state.era === 'current' ? '▲▼ is movement against where he finished in 2020.' : '';
+    `Tap a column head to sort. ${
+      state.era === 'current' ? '± is movement against where he finished in 2020.' : ''}`;
   $('#consensus-sub').textContent = t.boards
     ? `${t.boards} secret board${t.boards === 1 ? '' : 's'} in for ${label}. A man's own vote for himself never counts toward his numbers.`
     : '';
@@ -444,34 +447,80 @@ function renderConsensus() {
   }
 
   const span = t.rows.length;
-  const pct = (v) => ((v - 1) / Math.max(1, span - 1)) * 100;
 
-  host.innerHTML = t.rows
-    .map((r, i) => `
-      <div class="standing">
-        <div class="slot" data-rank="${i + 1}" data-total="${span}">${String(i + 1).padStart(2, '0')}</div>
-        <div class="standing-body">
-          <div class="standing-top">
-            <span class="nick">${r.nick}</span>
-            <span class="real">${NAME_BY_NICK[r.nick] ?? ''}</span>
-            ${movementTag(then, r.nick, i + 1)}
-            <span class="avg">${r.avg === null ? '—' : r.avg.toFixed(2)}</span>
-          </div>
-          <div class="range">
-            <div class="range-bar" style="left:${pct(r.best)}%;width:${Math.max(1.5, pct(r.worst) - pct(r.best))}%"></div>
-            <div class="range-tick" style="left:${pct(r.avg)}%"></div>
-          </div>
-          <div class="meta">
-            <span>BEST ${r.best ?? '—'}</span>
-            <span>WORST ${r.worst ?? '—'}</span>
-            <span>VOTES ${r.n}</span>
-          </div>
-        </div>
-      </div>`)
-    .join('');
+  // The finishing position is fixed to the average and travels with the man, so
+  // sorting by WORST doesn't renumber the board — #1 is still #1, wherever he
+  // lands in the list. It's also what the slot's light is painted from.
+  const placed = t.rows.map((r, i) => ({ ...r, place: i + 1 }));
+
+  const sorted = [...placed].sort((a, b) => {
+    const k = state.conSort;
+    let av, bv;
+    if (k === 'name') { av = a.nick.toLowerCase(); bv = b.nick.toLowerCase(); }
+    else if (k === 'move') {
+      // Unranked in 2020 sorts last either way; there's no movement to compare.
+      av = then[a.nick] ? then[a.nick] - a.place : -99;
+      bv = then[b.nick] ? then[b.nick] - b.place : -99;
+      av = -av; bv = -bv;                       // biggest climb first
+    } else {
+      av = a[k] ?? 99; bv = b[k] ?? 99;
+    }
+    return av > bv ? state.conDir : av < bv ? -state.conDir : 0;
+  });
+
+  const arrow = (k) => (state.conSort === k ? (state.conDir === 1 ? ' ↓' : ' ↑') : '');
+  // `#` and AVG are the same sort — the place IS the average — so only AVG
+  // carries the arrow. Two arrows on one ordering read like two sorts.
+  const th = (k, label, cls = 'num', tip = '', mark = true) =>
+    `<th class="${cls} ${state.conSort === k ? 'sorted' : ''}" ${
+      state.conSort === k ? `aria-sort="${state.conDir === 1 ? 'ascending' : 'descending'}"` : ''
+    }><button data-con="${k}"${tip ? ` title="${tip}"` : ''}>${label}${
+      mark ? arrow(k) : ''}</button></th>`;
+
+  const movementCol = Object.keys(then).length;
+
+  // Deliberately NOT wrapped in a .scroller like the other two tables: a
+  // horizontally scrollable ancestor is what `position: sticky` would resolve
+  // against, and the sticky column heads are the point on a phone. It fits
+  // instead — the man column shrinks with an ellipsis before anything spills.
+  host.innerHTML = `
+    <table class="standings">
+      <thead><tr>
+        ${th('avg', '#', 'place', 'Where he finished', false)}
+        ${th('name', 'MAN', 'man')}
+        ${movementCol ? th('move', '±', 'num', 'Movement against 2020') : ''}
+        ${th('avg', 'AVG', 'num', 'Average slot across every board')}
+        ${th('best', 'BEST', 'num', 'His best slot on any board')}
+        ${th('worst', 'WORST', 'num', 'His worst slot on any board')}
+        ${th('n', 'N', 'num', 'Boards counted — his own vote for himself is excluded')}
+      </tr></thead>
+      <tbody>${sorted.map((r) => `
+        <tr>
+          <td class="place"><span class="slot" data-rank="${r.place}" data-total="${span}">${
+            String(r.place).padStart(2, '0')}</span></td>
+          <td class="man"><span class="nick">${r.nick}</span><span class="real">${
+            NAME_BY_NICK[r.nick] ?? ''}</span></td>
+          ${movementCol ? `<td class="num">${movementTag(then, r.nick, r.place)}</td>` : ''}
+          <td class="num avg">${r.avg === null ? '—' : r.avg.toFixed(2)}</td>
+          <td class="num">${r.best ?? '—'}</td>
+          <td class="num">${r.worst ?? '—'}</td>
+          <td class="num dim">${r.n}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 
   host.querySelectorAll('.slot').forEach((el) =>
     paintSlot(el, +el.dataset.rank, +el.dataset.total));
+
+  host.querySelectorAll('button[data-con]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.con;
+      // Same header twice flips it. A new column starts ascending, which for
+      // every column here (average, best, worst, place) means best-first.
+      state.conDir = state.conSort === key ? -state.conDir : 1;
+      state.conSort = key;
+      renderConsensus();
+    }));
 
   $('#notes').innerHTML = t.notes.length
     ? `<h3 class="minihed">What they said</h3>` +
@@ -717,6 +766,8 @@ function init() {
       state.era = c.dataset.era;
       state.sortBy = 'avg';
       state.sortDir = 1;
+      state.conSort = 'avg';
+      state.conDir = 1;
       $$('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.era === state.era)));
       renderAll();
     }));
