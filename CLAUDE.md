@@ -64,10 +64,15 @@ The admin link must never go in the group chat: it reveals every board.
 - **Secret ballot, from the group only.** `ranker` IS recorded on every board. The
   secrecy is enforced at the read boundary, not by discarding the record. See
   "Anonymity" below.
-- **Everyone ranks all fourteen, themselves included — but a man's vote for himself
-  never counts toward his own average, best or worst.** That was the 2020 sheet's
-  rule and it holds. The exclusion happens in SQL (`angry_stats`), not the browser,
-  because it needs `ranker` and the browser is never given one.
+- **Everyone ranks all fourteen, themselves included — then the voter is lifted out
+  of his own board and the remaining thirteen are renumbered 1–13.** So a man's
+  vote for himself counts for nothing, and, just as importantly, *where he puts
+  himself changes nobody else's number either*. Dropping his row without
+  renumbering — which is what this did for a week — gave everyone he ranked below
+  himself a slot inflated by +1, and let a man move the whole board by moving
+  himself. Slots therefore top out at **13**, not 14. It happens in SQL
+  (`angry_stats`, `angry_positions`), not the browser, because it needs `ranker`
+  and the browser is never given one. Full consequences in CLAUDE-supabase.md.
 - **One man, one board — overwritten in place.** Resubmitting PATCHes the existing
   row. Revisions are deliberately *not* kept: a stack of edits from one man is a
   behavioural signature, and diffing them would expose him.

@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" onload="this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <div class="wrap">
@@ -34,7 +34,7 @@
   <!-- ─── Ballot ─────────────────────────────────────────────────────── -->
   <section class="panel on" id="panel-board" role="tabpanel">
     <h2 class="hed">Set the order</h2>
-    <p class="sub">Slot 1 is the funniest man here. Slot 14 is not. Drag the <strong>⣿</strong> handle, or focus a row and use the arrow keys. Rank yourself too — where you put yourself is never counted, and none of the others see it.</p>
+    <p class="sub">Slot 1 is the funniest man here. Slot 14 is not. Drag the <strong>⣿</strong> handle, or focus a row and use the arrow keys. Rank yourself too — you're lifted straight back out before anything is counted, so where you put yourself changes nobody's number, including your own. None of the others see it either.</p>
 
     <div class="gate" id="gate"></div>
 
@@ -72,7 +72,7 @@
   <!-- ─── Positions ──────────────────────────────────────────────────── -->
   <section class="panel" id="panel-positions" role="tabpanel">
     <h2 class="hed">Positions</h2>
-    <p class="sub">How often each man landed in each slot, across every board, ignoring his vote for himself. Tap a slot number to sort by who collected the most. Individual boards are secret — this is the closest anyone gets.</p>
+    <p class="sub">How often each man landed in each slot, across every board. Slots run to 13, not 14 — every board is renumbered with its own voter taken out of it. Tap a slot number to sort by who collected the most. Individual boards are secret — this is the closest anyone gets.</p>
 
     <div class="era">
       <button class="chip" data-era="current" aria-pressed="true">2026</button>
@@ -96,12 +96,12 @@
   </section>
 
   <footer>
-    Secret ballot · no board is ever shown to the group with a name on it · a man's vote for himself never counts toward his own numbers · 2020 boards imported from 12AM Humor.xlsx
+    Secret ballot · no board is ever shown to the group with a name on it · every board is counted with its own voter lifted out and the rest renumbered 1–13, so where a man puts himself moves nobody · 2020 boards imported from 12AM Humor.xlsx
   </footer>
 
 </div>
 
-<script src="data.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="data.js?v=13"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

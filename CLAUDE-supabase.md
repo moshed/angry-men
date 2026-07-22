@@ -76,15 +76,19 @@ select s.era, r.rankee,
        min(r.slot)::int               as best,
        max(r.slot)::int               as worst
   from public.angry_submissions s
-  cross join lateral unnest(s.ranking) with ordinality as r(rankee, slot)
- where r.rankee is distinct from s.ranker      -- <- the self-vote exclusion
+  cross join lateral (                       -- <- lift him out, THEN number
+    select u.rankee, row_number() over (order by u.ord) as slot
+      from unnest(array_remove(s.ranking, s.ranker)) with ordinality as u(rankee, ord)
+  ) r
  group by s.era, r.rankee;
 
-create or replace view public.angry_positions as   -- same WHERE clause
+create or replace view public.angry_positions as   -- same lateral
 select s.era, r.rankee, r.slot::int as slot, count(*)::int as cnt
   from public.angry_submissions s
-  cross join lateral unnest(s.ranking) with ordinality as r(rankee, slot)
- where r.rankee is distinct from s.ranker
+  cross join lateral (
+    select u.rankee, row_number() over (order by u.ord) as slot
+      from unnest(array_remove(s.ranking, s.ranker)) with ordinality as u(rankee, ord)
+  ) r
  group by s.era, r.rankee, r.slot;
 
 create or replace view public.angry_counts as
@@ -100,16 +104,36 @@ grant select on public.angry_stats, public.angry_positions,
 These are plain views, so they run as their owner and bypass RLS on the base table —
 that's what lets them serve numbers the anon key can't otherwise reach.
 
-**Why the aggregation has to happen here.** Excluding a man's vote for himself needs
-`ranker`, and `ranker` must never reach the browser. Do it in SQL and both hold at
-once. When this was computed client-side the exclusion was silently impossible, and
-self-votes were counted for a while — the 2020 figures drifting off the spreadsheet
-(Mordy 2.4 instead of 2.4444) was the tell. **`angry_stats` for era `2020` should
-reproduce `12AM Humor.xlsx` exactly; if it doesn't, something has regressed.**
+**Lift him out, then number — the order matters.** For a long time this dropped the
+voter's own row and kept everyone else's raw position, which quietly broke the one
+rule the page promises. If Bob put himself 1st and Nugsy 2nd, Nugsy scored a **2**
+from that board — a slot inflated by a man whose vote supposedly didn't count. Every
+man ranked below the voter carried the same +1. The tell: Bob edited his board to
+move himself out of first, and *other men's averages moved*. `array_remove` first,
+`row_number()` second, so a board is a clean 1–13 ranking of the other thirteen and
+where a man puts himself moves nobody, himself included.
 
-**`ranker` is `NOT NULL`, and that is load-bearing.** `rankee IS DISTINCT FROM NULL`
-is always true, so a single NULL-ranker row silently switches the self-vote exclusion
-off for that ballot — no error, just a quietly inflated average. It happened once:
+Consequences to know:
+
+- **Slots now top out at 13.** The Positions table builds its columns from the data
+  for exactly this reason; don't hard-code 14 there.
+- **Every average dropped**, by between 0.27 and 1.00 — most for the men the
+  self-rankers rated below themselves. **The 2026 finishing order did not change.**
+- **2020 no longer reproduces `12AM Humor.xlsx` exactly, and that is deliberate.**
+  The sheet had the same flaw. Under the corrected rule Mansy and Dogo swap 11th and
+  12th — they were 11.333 and 11.300 apart, inside the noise of the sheet's own two
+  ties. Both eras use the same math, which is what keeps `±AVG` honest.
+
+**Why the aggregation has to happen here.** It needs `ranker`, and `ranker` must
+never reach the browser. Do it in SQL and both hold at once. When this was computed
+client-side the exclusion was silently impossible and self-votes were counted for a
+while — the 2020 figures drifting off the spreadsheet (Mordy 2.4 instead of 2.4444)
+was the tell then.
+
+**`ranker` is `NOT NULL`, and that is load-bearing.** `array_remove(ranking, NULL)`
+strips nothing, so a single NULL-ranker row silently leaves that man's self-vote in
+and numbers his board 1–14 — no error, just a quietly inflated average. It happened
+once, under the old `rankee IS DISTINCT FROM ranker` form of the same bug:
 a man voted during the window between restoring names and redeploying the function,
 his board landed with no name, and it read 7.14 instead of 8.17 because his own
 2nd-place vote for himself was being counted. The constraint makes that fail loudly.

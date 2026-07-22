@@ -462,7 +462,7 @@ function renderConsensus() {
         ? '±PL is places gained on 2020, ±AVG is what his average did. Up is funnier in both.'
         : ''}`;
   $('#consensus-sub').textContent = t.boards
-    ? `${t.boards} secret board${t.boards === 1 ? '' : 's'} in for ${label}. A man's own vote for himself never counts toward his numbers.`
+    ? `${t.boards} secret board${t.boards === 1 ? '' : 's'} in for ${label}. Every board is counted with the voter lifted out of it, so where a man puts himself moves nobody.`
     : '';
 
   if (tooFew(t) || !t.boards) {
@@ -605,7 +605,11 @@ function renderPositions() {
 
   const span = t.rows.length;
   const places = placesFor(t.rows);
-  const slots = Array.from({ length: span }, (_, i) => i + 1);
+  // Slots run to 13, not 14: a board is renumbered once the voter's own name is
+  // taken out of it, so there is no 14th place for anyone else to land in.
+  const seen = t.rows.flatMap((r) => Object.keys(r.counts).map(Number));
+  const topSlot = seen.length ? Math.max(...seen) : span - 1;
+  const slots = Array.from({ length: topSlot }, (_, i) => i + 1);
   const peak = Math.max(1, ...t.rows.flatMap((r) => Object.values(r.counts)));
 
   const sorted = [...t.rows].sort((a, b) => {
