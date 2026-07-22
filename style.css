@@ -730,13 +730,35 @@ textarea:focus-visible,
 
 /* The grid is the one thing here that can't live inside a 760px column: a
    column per voter plus three totals runs past 800px once everyone is in.
-   Once there's room, it breaks out of the wrap and uses the window, so a
-   desktop reader gets the whole matrix without dragging it sideways. The
-   inset keeps it clear of a classic (non-overlay) scrollbar. */
+   So the panel becomes a full-window stage — but the table takes only the
+   width it actually needs and sits centred on it, rather than stretching to
+   the window and leaving the figures swimming. The heading and chips stay in
+   the ordinary reading column. `max-width` caps it at the viewport (less an
+   inset for a classic scrollbar), where the .scroller takes over again. */
 @media (min-width: 800px) {
   #panel-grid {
-    width: calc(100vw - 34px);
-    margin-left: calc(50% - 50vw + 17px);
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    padding: 26px 17px 0;
+  }
+
+  #panel-grid > .hed,
+  #panel-grid > .sub,
+  #panel-grid > .era {
+    max-width: 726px;
+    margin-inline: auto;
+  }
+
+  /* `min-content`, not `fit-content`: every cell here is `nowrap`, so a table's
+     min-content width is exactly the width at which nothing has to be scrolled
+     to and nothing is clipped — no more. `fit-content` gives max-content
+     instead, which pads every column out to ~1260px and is most of the way back
+     to stretching across the window. The chase list, the warning and the legend
+     inherit the width, so they line up with the table edges for free. */
+  #grid-host {
+    width: min-content;
+    max-width: 100%;
+    margin-inline: auto;
   }
 }
 
