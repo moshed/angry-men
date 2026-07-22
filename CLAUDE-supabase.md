@@ -63,9 +63,10 @@ can drop the column.
 
 ## The public views
 
-The public API serves **aggregates only**. There is no endpoint that returns an
-individual ordering in any form — `angry_board`, which used to serve anonymised
-ballots, has been dropped.
+The public API serves **aggregates only**. No view returns an individual ordering —
+`angry_board`, which used to serve anonymised ballots, has been dropped. The single
+exception is the `angry_my_board` RPC, which returns *your own* board and needs your
+own secret token to do it; see below.
 
 ```sql
 create or replace view public.angry_stats as
@@ -166,6 +167,37 @@ grant execute on function public.angry_whoami(text) to anon, authenticated;
 `SECURITY DEFINER` is what lets it see `angry_voters`, which RLS otherwise hides
 completely. It returns only the row matching an exact 22-char token, so it grants
 nothing to a caller who doesn't already have one, and `search_path` is pinned.
+
+## Reading your own board back: `angry_my_board`
+
+```sql
+create or replace function public.angry_my_board(k text)
+returns table (ranking text[], note text)
+language sql stable security definer set search_path = public, pg_temp
+as $$
+  select s.ranking, s.note
+    from public.angry_voters v
+    join public.angry_submissions s on s.id = v.ballot_id
+   where v.token = k;
+$$;
+grant execute on function public.angry_my_board(text) to anon, authenticated;
+```
+
+**This is the one endpoint that returns an individual ordering, and the exception is
+deliberate.** The lookup key is the secret token, so a man can only ever fetch his
+own — and the same token already lets him *overwrite* that board through the edge
+function, so it hands out nothing he didn't have. There is still no route from a
+*nick* to a board.
+
+It exists because without it, "one man, one board, edit it as often as you like"
+was only true on the browser he first voted from. The submitted board lived solely
+in that browser's `localStorage`; open the link on a phone and the page said
+"You're in" over the **2020 default order**, so his real board was invisible and
+unfixable — the group read that as "I can't edit my rankings". Reported by the men
+and fixed 21 Jul 2026.
+
+Keep it returning `ranking` and `note` only. Adding `created_at`, `id` or `ranker`
+here would put a timestamp or a name on a public route for the first time.
 
 **Why not the edge function.** It used to go through `angry-submit`, which cost
 **~250ms warm and over a second cold**, for one indexed lookup — the function was

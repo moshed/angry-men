@@ -71,6 +71,12 @@ The admin link must never go in the group chat: it reveals every board.
 - **One man, one board — overwritten in place.** Resubmitting PATCHes the existing
   row. Revisions are deliberately *not* kept: a stack of edits from one man is a
   behavioural signature, and diffing them would expose him.
+- **His board comes back from the server, not from his browser.** On load the page
+  calls the `angry_my_board` RPC with his token and renders what he actually
+  submitted. It used to restore from `localStorage` alone, so on any second device
+  the page said "You're in" above the 2020 default order — the board he'd sent was
+  nowhere, which the men reported as not being able to edit their rankings. If he's
+  already started dragging when the answer lands (`state.touched`), his hands win.
 - **Results stay hidden until 3 boards are in** (`MIN_BALLOTS`), since with one
   ballot the "average" is simply that man's board read aloud.
 - **No ties.** A drag-ordered list can't express them. The 2020 sheet had two

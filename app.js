@@ -43,6 +43,9 @@ const state = {
   voted: false,
   deadline: null,
   closed: false,
+  // Set the moment he moves a row. His own submitted board arrives a beat after
+  // first paint, and must never overwrite a change he's already started making.
+  touched: false,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -100,6 +103,7 @@ function renderBoard() {
 
 function move(from, to) {
   if (to < 0 || to >= state.board.length || to === from) return;
+  state.touched = true;
   const [man] = state.board.splice(from, 1);
   state.board.splice(to, 0, man);
   renderBoard();
@@ -181,6 +185,42 @@ function initDrag() {
 /* ─── Identity ────────────────────────────────────────────────────────── */
 
 const idKey = () => `angry.id.${state.token}`;
+// Per token, not global: two men on one phone would otherwise inherit each
+// other's board. `angry.board` (no token) is the pre-2026 key, read once.
+const boardKey = () => `angry.board.${state.token || 'anon'}`;
+
+const isFullBoard = (b) =>
+  Array.isArray(b) && b.length === DEFAULT_BOARD.length &&
+  new Set(b).size === b.length && DEFAULT_BOARD.every((n) => b.includes(n));
+
+/** His own board, read back from the server with his own token.
+ *
+ *  Without this, a man who voted on his laptop and reopened the link on his
+ *  phone was shown the 2020 default order and told he was "in" — the board he
+ *  actually submitted lived only in the other browser's localStorage. He can
+ *  only ever fetch his own: the token is the lookup key, and it's the same
+ *  token that already lets him overwrite that board, so this grants nothing new.
+ *  Nothing here goes near another man's ballot. */
+async function fetchMyBoard() {
+  if (!state.token) return;
+  try {
+    const res = await fetch(`${REST}/rpc/angry_my_board`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ k: state.token }),
+    });
+    const [row] = await res.json();
+    if (!row || !isFullBoard(row.ranking)) return;
+
+    localStorage.setItem(boardKey(), JSON.stringify(row.ranking));
+    // He may have started dragging while this was in flight. His hands win.
+    if (state.touched) return;
+    state.board = row.ranking;
+    renderBoard();
+    // Carry his note back too, or a resubmit silently wipes it.
+    if (row.note && !$('#note').value) $('#note').value = row.note;
+  } catch { /* offline: whatever's cached locally stands */ }
+}
 
 /** Last known answer for this token, so a return visit renders with no wait. */
 function useCachedIdentity() {
@@ -286,10 +326,18 @@ async function submit() {
     if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
 
     state.voted = true;
-    localStorage.setItem('angry.board', JSON.stringify(state.board));
+    state.touched = false;
+    localStorage.setItem(boardKey(), JSON.stringify(state.board));
+    // The cached identity says "hasn't voted" until it's refreshed; correct it
+    // now so a reload doesn't offer to "Lock in" a board that's already in.
+    try {
+      const c = JSON.parse(localStorage.getItem(idKey()) || 'null');
+      if (c) localStorage.setItem(idKey(), JSON.stringify({ ...c, voted: true }));
+    } catch { /* nothing cached */ }
     msg.textContent = 'Board in. None of the others can see it was yours.';
     msg.className = 'note good';
-    $('#note').value = '';
+    // The note is deliberately left in place — clearing it meant the next
+    // resubmit sent an empty one and wiped what he'd written.
     await load();
     renderAll();
     show('consensus');
@@ -626,8 +674,9 @@ function renderAll() {
 }
 
 function init() {
-  const saved = JSON.parse(localStorage.getItem('angry.board') || 'null');
-  if (Array.isArray(saved) && saved.length === DEFAULT_BOARD.length) state.board = saved;
+  const saved = JSON.parse(
+    localStorage.getItem(boardKey()) || localStorage.getItem('angry.board') || 'null');
+  if (isFullBoard(saved)) state.board = saved;
 
   renderBoard();
   initDrag();
@@ -635,11 +684,13 @@ function init() {
   $('#submit').addEventListener('click', submit);
   $('#reset').addEventListener('click', () => {
     state.board = [...DEFAULT_BOARD];
+    state.touched = true;
     renderBoard();
     $('#submit-note').textContent = 'Back to the 2020 order.';
     $('#submit-note').className = 'note';
   });
   $('#shuffle').addEventListener('click', () => {
+    state.touched = true;
     for (let i = state.board.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [state.board[i], state.board[j]] = [state.board[j], state.board[i]];
@@ -662,6 +713,7 @@ function init() {
   useCachedIdentity();
   renderIdentity();
   identify().then(renderIdentity);
+  fetchMyBoard();
   loadAdmin().then(renderGrid);
 
   load()
