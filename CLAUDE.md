@@ -6,7 +6,10 @@ it in; the boards roll up into a consensus table and a sortable positions pivot.
 **Ballots are secret from the group** — the men see aggregates only. The runner
 sees everything via an admin link.
 
-- **Live:** https://moshed.github.io/angry-men/
+- **Live:** https://amhumor.dancykier.com/ (custom domain; `CNAME` file + Namecheap
+  CNAME `amhumor → moshed.github.io.`). The old `moshed.github.io/angry-men/…` URL
+  301-redirects here **with the query string intact**, so every voting link already
+  sent still works — the `?k=` token survives the redirect.
 - **Repo:** `moshed/angry-men` (public — GitHub Pages on a free account requires it)
 - **Local source:** `/Users/moshe/Apps/Angry Men Rankings/`
 - **Backend:** Supabase — see [CLAUDE-supabase.md](CLAUDE-supabase.md)
