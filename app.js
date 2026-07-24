@@ -752,12 +752,12 @@ function renderGrid() {
       <tbody>${sorted.map((rankee) => `
         <tr data-rankee="${rankee}" class="${state.gridLit === rankee ? 'lit' : ''}"><th class="rowhead"><span>${placeBadge(places[rankee], total)}${rankee}</span></th>
         ${rankers.map((r) => {
-          // His own column, on his own row: the vote that counts for nothing.
-          // Show where he put himself, outlined and unlit, so the row's other
-          // cells are exactly the numbers AVG is the mean of.
+          // His own column, on his own row: the vote that counts for nothing,
+          // so it reads as a blank "—" rather than a number that would invite
+          // being added into the row. Where he actually put himself still lives
+          // in the SELF total column. Outlined and unlit either way.
           if (r === rankee) {
-            const s = selfOf(r);
-            return `<td class="cell self" title="Where ${r} put himself — not counted">${s ?? '·'}</td>`;
+            return `<td class="cell self" style="color:var(--line)" title="${r}'s vote for himself — not counted">—</td>`;
           }
           const v = at(r, rankee);
           if (v === null) return `<td class="cell" style="color:var(--line)">·</td>`;
@@ -771,7 +771,7 @@ function renderGrid() {
       </tbody>
     </table></div>
     <div class="legend"><span>RANK 1</span><span class="legend-scale"></span><span>RANK ${counted}</span>
-      <span style="margin-left:auto">CELLS ARE THE RANK EACH VOTE COUNTED AS, 1–${counted} · THE OUTLINED CELL IS HIS OWN VOTE FOR HIMSELF AND COUNTS FOR NOTHING · AVG IS THE MEAN OF THE REST · GAP = AVG − SELF, + MEANS HE FLATTERS HIMSELF</span></div>`;
+      <span style="margin-left:auto">CELLS ARE THE RANK EACH VOTE COUNTED AS, 1–${counted} · A MAN'S VOTE FOR HIMSELF IS "—" AND COUNTS FOR NOTHING (SEE THE SELF COLUMN) · AVG IS THE MEAN OF THE REST · GAP = AVG − SELF, + MEANS HE FLATTERS HIMSELF</span></div>`;
 
   paintPlaces(host);
 
